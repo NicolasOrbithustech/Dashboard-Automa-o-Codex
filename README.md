@@ -20,8 +20,10 @@ Depois acesse `http://127.0.0.1:8765`.
 - Redes sociais com perfil, cadencia, metricas e proxima acao
 - Automacoes recorrentes com agenda, dono, risco, status, execucao manual e ultima execucao
 - Esteira de conteudo em kanban: Rascunho, Aprovacao, Agendado e Publicado
+- Fila de publicacao e distribuicao com agendamento, UTMs e link publicado
 - Koins com snapshots de metricas, premios, estoque, resgates e alertas
 - Fila de aprovacao humana com aprovar/rejeitar
+- Suporte e comunidade com classificacao, resposta sugerida e FAQ
 - Relatorios com trafego, posts, cadastros e resumo executivo
 - Governanca com regras operacionais e referencias de cofre
 
@@ -30,9 +32,10 @@ Depois acesse `http://127.0.0.1:8765`.
 - `Sites`: cadastre cada projeto e mantenha apenas a referencia do cofre, nunca a senha.
 - `Redes`: registre os perfis oficiais de cada site e acompanhe cadencia, posts, cliques, crescimento e proxima acao.
 - `Automacoes`: cadastre rotinas que o Codex ou integracoes externas vao executar. Use `Rodar` para registrar uma execucao manual e `Pausar` quando a rotina precisar de revisao.
-- `Conteudo`: acompanhe tarefas editoriais em kanban. O botao `Avancar` move o item pela esteira ate `Publicado`.
+- `Conteudo`: acompanhe tarefas editoriais em kanban. O botao `Avancar` move o item pela esteira ate `Publicado`. A fila de distribuicao registra destino, agendamento, UTM e link publicado.
 - `Koins`: registre uma leitura atual dos saldos e cadastre premios com custo, estoque, resgates e status.
 - `Aprovacoes`: envie decisoes sensiveis para fila humana, como campanhas, premios, respostas de suporte ou mudancas de regras.
+- `Suporte`: classifique mensagens por tema, gere uma resposta sugerida, marque como respondida e transforme perguntas repetidas em FAQ.
 - `Relatorios`: registre trafego, posts e cadastros por dia para alimentar os graficos e o resumo executivo.
 - `Governanca`: mantenha regras de seguranca e limites de automacao, alem das referencias de cofre vindas dos sites.
 
@@ -53,9 +56,12 @@ sites
 social_accounts
 automations
 content_items
+distribution_tasks
 prizes
 koin_metrics
 approvals
+support_messages
+faq_entries
 report_metrics
 governance_rules
 ```

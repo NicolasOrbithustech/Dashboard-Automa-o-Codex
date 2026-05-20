@@ -59,6 +59,11 @@
         <path d="M4 12a8 8 0 0 1 13.7-5.6M20 12a8 8 0 0 1-13.7 5.6" />
         <path d="M18 4v4h-4M6 20v-4h4" />
       </symbol>
+      <symbol id="icon-support" viewBox="0 0 24 24">
+        <path d="M5 12a7 7 0 0 1 14 0v5a2 2 0 0 1-2 2h-2" />
+        <path d="M5 12v3a2 2 0 0 0 2 2h1v-6H7a2 2 0 0 0-2 2M19 12v3a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2" />
+        <path d="M12 19h3" />
+      </symbol>
     </svg>
 
     <div class="app-shell">
@@ -92,6 +97,9 @@
           </button>
           <button class="nav-item" data-view="approvals" title="Aprovacoes">
             <svg><use href="#icon-approval"></use></svg><span>Aprovacoes</span>
+          </button>
+          <button class="nav-item" data-view="support" title="Suporte e comunidade">
+            <svg><use href="#icon-support"></use></svg><span>Suporte</span>
           </button>
           <button class="nav-item" data-view="reports" title="Relatorios">
             <svg><use href="#icon-report"></use></svg><span>Relatorios</span>
@@ -303,6 +311,37 @@
             </button>
           </form>
           <div id="contentBoard" class="kanban"></div>
+          <div class="section-head compact-head">
+            <div>
+              <p class="eyebrow">Publicacao</p>
+              <h3>Fila de distribuicao</h3>
+            </div>
+          </div>
+          <form id="distributionForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Conteudo aprovado</span><select name="content_id" data-content-select></select></label>
+            <label class="field"><span>Destino</span><input name="target" required placeholder="Blog, Instagram, email..." /></label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                <option value="fila">Fila</option>
+                <option value="rascunho">Rascunho</option>
+                <option value="agendado">Agendado</option>
+                <option value="publicado">Publicado</option>
+                <option value="erro">Erro</option>
+              </select>
+            </label>
+            <label class="field"><span>Agendar para</span><input name="scheduled_for" type="datetime-local" /></label>
+            <label class="field"><span>URL publicada/base</span><input name="published_url" placeholder="https://..." /></label>
+            <label class="field"><span>UTM source</span><input name="utm_source" placeholder="instagram" /></label>
+            <label class="field"><span>UTM medium</span><input name="utm_medium" placeholder="social" /></label>
+            <label class="field"><span>UTM campaign</span><input name="utm_campaign" placeholder="koins_maio" /></label>
+            <label class="field"><span>Observacao</span><input name="note" placeholder="Criar rascunho no CMS" /></label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
+          <div id="distributionTable" class="data-table"></div>
         </section>
 
         <section id="koins" class="view" aria-labelledby="koins-title">
@@ -371,6 +410,71 @@
             </button>
           </form>
           <div id="approvalList" class="approval-list"></div>
+        </section>
+
+        <section id="support" class="view" aria-labelledby="support-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Comunidade</p>
+              <h3 id="support-title">Suporte, comentarios e FAQ</h3>
+            </div>
+          </div>
+          <form id="supportForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Origem</span><input name="source" placeholder="Instagram, email, chat..." /></label>
+            <label class="field"><span>Autor</span><input name="author" placeholder="Nome ou @usuario" /></label>
+            <label class="field">
+              <span>Categoria</span>
+              <select name="category">
+                <option value="duvida">Duvida</option>
+                <option value="elogio">Elogio</option>
+                <option value="reclamacao">Reclamacao</option>
+                <option value="premio">Premio</option>
+                <option value="bug">Bug</option>
+                <option value="fraude">Fraude</option>
+                <option value="parceria">Parceria</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Risco</span>
+              <select name="risk">
+                <option value="baixo">Baixo</option>
+                <option value="medio">Medio</option>
+                <option value="alto">Alto</option>
+              </select>
+            </label>
+            <label class="field wide-field"><span>Mensagem</span><textarea name="message" required placeholder="Cole aqui o comentario ou mensagem recebida"></textarea></label>
+            <label class="field wide-field"><span>Resposta sugerida</span><textarea name="suggested_reply" placeholder="Pode deixar vazio para gerar sugestao automatica"></textarea></label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
+          <div id="supportList" class="approval-list"></div>
+
+          <div class="section-head compact-head">
+            <div>
+              <p class="eyebrow">Base de conhecimento</p>
+              <h3>FAQ operacional</h3>
+            </div>
+          </div>
+          <form id="faqForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Tema</span><input name="topic" placeholder="premios, Koins, cadastro..." /></label>
+            <label class="field wide-field"><span>Pergunta</span><textarea name="question" required placeholder="Pergunta recorrente"></textarea></label>
+            <label class="field wide-field"><span>Resposta</span><textarea name="answer" required placeholder="Resposta aprovada"></textarea></label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                <option value="rascunho">Rascunho</option>
+                <option value="aprovado">Aprovado</option>
+                <option value="publicado">Publicado</option>
+              </select>
+            </label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
+          <div id="faqTable" class="data-table"></div>
         </section>
 
         <section id="reports" class="view" aria-labelledby="reports-title">

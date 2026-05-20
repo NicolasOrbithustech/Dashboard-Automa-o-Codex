@@ -35,7 +35,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -236,7 +237,8 @@ button {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   min-height: 40px;
   width: 100%;
   border: 1px solid var(--line);
@@ -248,9 +250,20 @@ button {
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(35, 103, 166, 0.14);
+}
+
+.field textarea {
+  min-height: 92px;
+  padding: 10px 11px;
+  resize: vertical;
+}
+
+.wide-field {
+  grid-column: span 2;
 }
 
 .search-field {
@@ -310,6 +323,10 @@ button {
 
 .section-head h3 {
   font-size: 20px;
+}
+
+.compact-head {
+  margin-top: 18px;
 }
 
 .panel {
@@ -684,6 +701,15 @@ button {
   border-color: var(--red);
 }
 
+.reply-box {
+  margin-top: 8px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--slate);
+}
+
 .line-bars {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -776,6 +802,10 @@ button {
   .reports-grid,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .wide-field {
+    grid-column: auto;
   }
 }
 

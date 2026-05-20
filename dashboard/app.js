@@ -6,9 +6,12 @@ const seedData = {
   socials: [],
   automations: [],
   content: [],
+  distribution: [],
   prizes: [],
   koinMetrics: [],
   approvals: [],
+  supportMessages: [],
+  faqEntries: [],
   reports: [],
   rules: [],
   auditLog: [],
@@ -25,9 +28,12 @@ const tableConfig = {
   socials: { table: "social_accounts", order: "created_at.desc", normalize: normalizeSocials },
   automations: { table: "automations", order: "created_at.desc", normalize: normalizeAutomations },
   content: { table: "content_items", order: "created_at.desc", normalize: normalizeContent },
+  distribution: { table: "distribution_tasks", order: "created_at.desc", normalize: normalizeDistribution },
   prizes: { table: "prizes", order: "created_at.desc", normalize: normalizePrizes },
   koinMetrics: { table: "koin_metrics", order: "measured_at.desc", normalize: normalizeKoinMetrics },
   approvals: { table: "approvals", order: "created_at.desc", normalize: normalizeApprovals },
+  supportMessages: { table: "support_messages", order: "created_at.desc", normalize: normalizeSupportMessages },
+  faqEntries: { table: "faq_entries", order: "created_at.desc", normalize: normalizeFaqEntries },
   reports: { table: "report_metrics", order: "report_date.desc,created_at.desc", normalize: normalizeReports },
   rules: { table: "governance_rules", order: "created_at.desc", normalize: normalizeRules }
 };
@@ -48,6 +54,7 @@ const titles = {
   content: "Conteudo",
   koins: "Koins e premios",
   approvals: "Aprovacoes",
+  support: "Suporte",
   reports: "Relatorios",
   settings: "Governanca"
 };
@@ -72,9 +79,12 @@ function normalizeState(value) {
     socials: normalizeSocials(value.socials || value.social_accounts || []),
     automations: normalizeAutomations(value.automations || []),
     content: normalizeContent(value.content || value.content_items || []),
+    distribution: normalizeDistribution(value.distribution || value.distribution_tasks || []),
     prizes: normalizePrizes(value.prizes || []),
     koinMetrics: normalizeKoinMetrics(value.koinMetrics || value.koin_metrics || []),
     approvals: normalizeApprovals(value.approvals || []),
+    supportMessages: normalizeSupportMessages(value.supportMessages || value.support_messages || []),
+    faqEntries: normalizeFaqEntries(value.faqEntries || value.faq_entries || []),
     reports: normalizeReports(value.reports || value.report_metrics || []),
     rules: normalizeRules(value.rules || value.governance_rules || [])
   };
@@ -196,7 +206,32 @@ function normalizeContent(items) {
     status: item.status || "Rascunho",
     risk: item.risk || "baixo",
     due_date: item.due_date || item.due || null,
+    approved_at: item.approved_at || null,
+    scheduled_for: item.scheduled_for || null,
+    published_at: item.published_at || null,
+    published_url: item.published_url || "",
+    utm_url: item.utm_url || "",
     next_action: item.next_action || item.nextAction || "",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeDistribution(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    content_id: item.content_id || item.contentId || "",
+    target: item.target || "",
+    status: item.status || "fila",
+    scheduled_for: item.scheduled_for || null,
+    published_at: item.published_at || null,
+    published_url: item.published_url || "",
+    utm_source: item.utm_source || "",
+    utm_medium: item.utm_medium || "",
+    utm_campaign: item.utm_campaign || "",
+    utm_url: item.utm_url || "",
+    note: item.note || "",
     created_at: item.created_at || null,
     updated_at: item.updated_at || null
   }));
@@ -240,6 +275,36 @@ function normalizeApprovals(items) {
     risk: item.risk || "medio",
     status: item.status || "pendente",
     decided_at: item.decided_at || null,
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeSupportMessages(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    source: item.source || "",
+    author: item.author || "",
+    message: item.message || "",
+    category: item.category || "duvida",
+    risk: item.risk || "baixo",
+    status: item.status || "novo",
+    suggested_reply: item.suggested_reply || "",
+    final_reply: item.final_reply || "",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeFaqEntries(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    topic: item.topic || "",
+    question: item.question || "",
+    answer: item.answer || "",
+    status: item.status || "rascunho",
     created_at: item.created_at || null,
     updated_at: item.updated_at || null
   }));
@@ -357,7 +422,7 @@ async function updateSite(id, patch) {
 
 async function deleteSite(id) {
   await deleteRecord("sites", id);
-  ["socials", "automations", "content", "prizes", "koinMetrics", "approvals", "reports"].forEach((key) => {
+  ["socials", "automations", "content", "distribution", "prizes", "koinMetrics", "approvals", "supportMessages", "faqEntries", "reports"].forEach((key) => {
     state[key] = state[key].filter((item) => item.site_id !== id);
   });
 }
@@ -371,6 +436,23 @@ function updateSyncStatus(label, type = "info") {
 function siteName(siteId) {
   if (siteId === "all") return "Todos";
   return state.sites.find((site) => site.id === siteId)?.name || "Sem site";
+}
+
+function contentTitle(contentId) {
+  return state.content.find((item) => item.id === contentId)?.title || "Conteudo sem titulo";
+}
+
+function buildUtmUrl(baseUrl, source, medium, campaign) {
+  if (!baseUrl) return "";
+  try {
+    const url = new URL(baseUrl);
+    if (source) url.searchParams.set("utm_source", source);
+    if (medium) url.searchParams.set("utm_medium", medium);
+    if (campaign) url.searchParams.set("utm_campaign", campaign);
+    return url.toString();
+  } catch {
+    return baseUrl;
+  }
 }
 
 function formatDate(value) {
@@ -432,8 +514,11 @@ function render() {
   renderSocial();
   renderAutomations();
   renderContent();
+  renderDistribution();
   renderKoins();
   renderApprovals();
+  renderSupport();
+  renderFaq();
   renderReports();
   renderSettings();
   updateSyncStatus(syncMode === "supabase" ? "Supabase conectado" : "Modo local", syncMode === "supabase" ? "ok" : "info");
@@ -461,6 +546,19 @@ function renderFormSiteSelects() {
   });
   const reportDate = qs("#reportForm input[name='report_date']");
   if (reportDate && !reportDate.value) reportDate.value = todayValue();
+  renderContentSelects();
+}
+
+function renderContentSelects() {
+  qsa("[data-content-select]").forEach((select) => {
+    const current = select.value;
+    const options = state.content.filter((item) => ["Agendado", "Publicado"].includes(item.status));
+    select.innerHTML = options.length
+      ? options.map((item) => `<option value="${esc(item.id)}">${esc(item.title)} - ${esc(siteName(item.site_id))}</option>`).join("")
+      : `<option value="">Sem conteudo aprovado</option>`;
+    select.disabled = !options.length;
+    if (options.some((item) => item.id === current)) select.value = current;
+  });
 }
 
 function renderKpis() {
@@ -506,6 +604,16 @@ function renderNextActions() {
     detail: `${siteName(item.site_id)} - vence ${formatShortDate(item.due_date)}`,
     risk: item.risk
   }));
+  const distributionActions = filtered(state.distribution).filter((item) => item.status !== "publicado").map((item) => ({
+    title: `Distribuir: ${contentTitle(item.content_id)}`,
+    detail: `${siteName(item.site_id)} - ${item.target || "sem destino"}`,
+    risk: item.status === "erro" ? "alto" : "baixo"
+  }));
+  const supportActions = filtered(state.supportMessages).filter((item) => ["novo", "sugerido", "aprovacao"].includes(item.status)).map((item) => ({
+    title: `Responder ${item.category}: ${item.author || item.source || "sem autor"}`,
+    detail: `${siteName(item.site_id)} - ${item.status}`,
+    risk: item.risk
+  }));
   const approvalActions = filtered(state.approvals)
     .filter((item) => item.status === "pendente")
     .map((item) => ({
@@ -518,7 +626,7 @@ function renderNextActions() {
     detail: `${siteName(item.site_id)} - estoque ${item.stock}`,
     risk: item.status === "critico" ? "alto" : "medio"
   }));
-  const actions = [...approvalActions, ...prizeActions, ...automationActions, ...contentActions, ...socialActions, ...siteActions].slice(0, 8);
+  const actions = [...approvalActions, ...supportActions, ...prizeActions, ...distributionActions, ...automationActions, ...contentActions, ...socialActions, ...siteActions].slice(0, 8);
   qs("#nextActions").innerHTML = actions.length ? actions.map((item) => `
     <article class="action-row">
       <div>
@@ -650,6 +758,7 @@ function renderContent() {
             <h5>${esc(item.title)}</h5>
             <p>${esc(siteName(item.site_id))} - ${esc(item.channel || "sem canal")} - vence ${esc(formatShortDate(item.due_date))}</p>
             <p>${esc(item.next_action || "Sem proxima acao")}</p>
+            ${item.published_url ? `<p><a href="${esc(item.published_url)}" target="_blank" rel="noreferrer">Publicado</a></p>` : ""}
             <div class="row-actions">
               ${riskChip(item.risk)}
               ${nextContentButton(item)}
@@ -667,6 +776,28 @@ function nextContentButton(item) {
   if (index < 0 || index === columns.length - 1) return "";
   const label = index === 1 ? "Aprovar" : "Avancar";
   return miniButton("advanceContent", item.id, label, "approve");
+}
+
+function renderDistribution() {
+  const tasks = filtered(state.distribution);
+  qs("#distributionTable").innerHTML = tableMarkup(
+    ["Conteudo", "Site", "Destino", "Status", "Agendamento", "UTM", "Publicado", "Observacao", "Acoes"],
+    tasks.map((item) => [
+      esc(contentTitle(item.content_id)),
+      esc(siteName(item.site_id)),
+      esc(item.target),
+      statusChip(item.status),
+      esc(formatDate(item.scheduled_for)),
+      item.utm_url ? `<a href="${esc(item.utm_url)}" target="_blank" rel="noreferrer">Abrir UTM</a>` : esc("Pendente"),
+      item.published_url ? `<a href="${esc(item.published_url)}" target="_blank" rel="noreferrer">Link</a>` : esc(formatDate(item.published_at)),
+      esc(item.note),
+      rowActions([
+        item.status !== "agendado" && item.status !== "publicado" ? miniButton("scheduleDistribution", item.id, "Agendar") : "",
+        item.status !== "publicado" ? miniButton("publishDistribution", item.id, "Publicado", "approve") : "",
+        miniButton("deleteRecord", item.id, "Excluir", "reject", "distribution")
+      ])
+    ])
+  );
 }
 
 function renderKoins() {
@@ -719,6 +850,46 @@ function renderApprovals() {
       </div>
     </article>
   `).join("") : emptyState("Nenhuma aprovacao encontrada para o filtro atual.");
+}
+
+function renderSupport() {
+  const messages = filtered(state.supportMessages);
+  qs("#supportList").innerHTML = messages.length ? messages.map((item) => `
+    <article class="approval-row">
+      <div>
+        <h5>${esc(item.category)} - ${esc(item.author || item.source || "sem autor")}</h5>
+        <p>${esc(siteName(item.site_id))} - ${esc(item.source || "sem origem")}</p>
+        <p>${esc(item.message)}</p>
+        ${item.suggested_reply ? `<div class="reply-box">${esc(item.suggested_reply)}</div>` : ""}
+      </div>
+      <div class="row-actions">
+        ${riskChip(item.risk)}
+        ${statusChip(item.status)}
+        ${!item.suggested_reply ? miniButton("suggestReply", item.id, "Sugerir") : ""}
+        ${item.status !== "respondido" ? miniButton("markResponded", item.id, "Respondido", "approve") : ""}
+        ${miniButton("supportToFaq", item.id, "FAQ") }
+        ${miniButton("deleteRecord", item.id, "Excluir", "reject", "supportMessages")}
+      </div>
+    </article>
+  `).join("") : emptyState("Nenhuma mensagem de suporte encontrada.");
+}
+
+function renderFaq() {
+  const entries = filtered(state.faqEntries);
+  qs("#faqTable").innerHTML = tableMarkup(
+    ["Pergunta", "Site", "Tema", "Resposta", "Status", "Acoes"],
+    entries.map((item) => [
+      esc(item.question),
+      esc(siteName(item.site_id)),
+      esc(item.topic),
+      esc(item.answer),
+      statusChip(item.status),
+      rowActions([
+        item.status !== "publicado" ? miniButton("publishFaq", item.id, "Publicar", "approve") : "",
+        miniButton("deleteRecord", item.id, "Excluir", "reject", "faqEntries")
+      ])
+    ])
+  );
 }
 
 function reportSeries() {
@@ -845,6 +1016,11 @@ function formNumber(data, name) {
   return Number(data.get(name) || 0);
 }
 
+function formDateTime(data, name) {
+  const value = formString(data, name);
+  return value ? new Date(value).toISOString() : null;
+}
+
 function requireSite(data) {
   const siteId = formString(data, "site_id");
   if (!siteId) throw new Error("Cadastre e selecione um site primeiro.");
@@ -932,6 +1108,27 @@ function contentPayload(data) {
   };
 }
 
+function distributionPayload(data) {
+  const publishedUrl = formString(data, "published_url");
+  const utmSource = formString(data, "utm_source");
+  const utmMedium = formString(data, "utm_medium");
+  const utmCampaign = formString(data, "utm_campaign");
+  return {
+    site_id: requireSite(data),
+    content_id: formString(data, "content_id") || null,
+    target: formString(data, "target"),
+    status: formString(data, "status", "fila"),
+    scheduled_for: formDateTime(data, "scheduled_for"),
+    published_at: formString(data, "status") === "publicado" ? new Date().toISOString() : null,
+    published_url: publishedUrl,
+    utm_source: utmSource,
+    utm_medium: utmMedium,
+    utm_campaign: utmCampaign,
+    utm_url: buildUtmUrl(publishedUrl, utmSource, utmMedium, utmCampaign),
+    note: formString(data, "note")
+  };
+}
+
 function koinMetricPayload(data) {
   return {
     site_id: requireSite(data),
@@ -962,6 +1159,48 @@ function approvalPayload(data) {
     detail: formString(data, "detail"),
     risk: formString(data, "risk", "medio"),
     status: "pendente"
+  };
+}
+
+function suggestedReplyFor(category, message) {
+  const cleanMessage = message ? ` Sobre sua mensagem: "${message.slice(0, 120)}"` : "";
+  const templates = {
+    duvida: `Oi! Obrigado por chamar. Vamos te orientar com clareza.${cleanMessage} Se a duvida for sobre Koins ou premios, confira tambem as regras dentro da sua conta.`,
+    elogio: "Muito obrigado pelo retorno! Ficamos felizes em saber que a experiencia esta ajudando. Vamos continuar melhorando.",
+    reclamacao: "Obrigado por avisar. Vamos analisar o caso com cuidado e retornar com uma posicao. Para seguranca, nao envie senha ou dados sensiveis por aqui.",
+    premio: "Obrigado por falar sobre o premio. Vamos conferir o status do resgate e as regras aplicaveis antes de confirmar qualquer prazo.",
+    bug: "Obrigado pelo aviso. Vamos registrar o problema e verificar o fluxo. Se puder, envie horario aproximado e o passo em que ocorreu.",
+    fraude: "Obrigado pelo alerta. Esse caso precisa de revisao manual por seguranca. Vamos encaminhar para analise antes de qualquer acao.",
+    parceria: "Obrigado pelo interesse. Vamos revisar a proposta e retornar caso exista encaixe com nossos criterios de parceria."
+  };
+  return templates[category] || templates.duvida;
+}
+
+function supportPayload(data) {
+  const category = formString(data, "category", "duvida");
+  const risk = formString(data, "risk", "baixo");
+  const message = formString(data, "message");
+  const suggested = formString(data, "suggested_reply") || suggestedReplyFor(category, message);
+  return {
+    site_id: requireSite(data),
+    source: formString(data, "source"),
+    author: formString(data, "author"),
+    message,
+    category,
+    risk,
+    status: risk === "alto" || ["reclamacao", "premio", "fraude"].includes(category) ? "aprovacao" : "sugerido",
+    suggested_reply: suggested,
+    final_reply: ""
+  };
+}
+
+function faqPayload(data) {
+  return {
+    site_id: requireSite(data),
+    topic: formString(data, "topic"),
+    question: formString(data, "question"),
+    answer: formString(data, "answer"),
+    status: formString(data, "status", "rascunho")
   };
 }
 
@@ -1090,10 +1329,84 @@ document.addEventListener("click", async (event) => {
     if (action === "advanceContent") {
       const content = state.content.find((item) => item.id === id);
       const next = columns[columns.indexOf(content.status) + 1];
-      await updateRecord("content", id, { status: next || content.status });
+      const patch = { status: next || content.status };
+      if (next === "Agendado") patch.approved_at = new Date().toISOString();
+      if (next === "Publicado") patch.published_at = new Date().toISOString();
+      await updateRecord("content", id, patch);
       saveState();
       render();
       toast("Conteudo avancou na esteira.");
+    }
+    if (action === "scheduleDistribution") {
+      const task = state.distribution.find((item) => item.id === id);
+      await updateRecord("distribution", id, {
+        status: "agendado",
+        scheduled_for: task.scheduled_for || new Date().toISOString(),
+        utm_url: task.utm_url || buildUtmUrl(task.published_url, task.utm_source, task.utm_medium, task.utm_campaign)
+      });
+      saveState();
+      render();
+      toast("Distribuicao agendada.");
+    }
+    if (action === "publishDistribution") {
+      const task = state.distribution.find((item) => item.id === id);
+      const stamp = new Date().toISOString();
+      await updateRecord("distribution", id, {
+        status: "publicado",
+        published_at: stamp,
+        utm_url: task.utm_url || buildUtmUrl(task.published_url, task.utm_source, task.utm_medium, task.utm_campaign)
+      });
+      if (task.content_id) {
+        await updateRecord("content", task.content_id, {
+          status: "Publicado",
+          published_at: stamp,
+          published_url: task.published_url,
+          utm_url: task.utm_url || buildUtmUrl(task.published_url, task.utm_source, task.utm_medium, task.utm_campaign)
+        });
+      }
+      saveState();
+      render();
+      toast("Publicacao registrada.");
+    }
+    if (action === "suggestReply") {
+      const message = state.supportMessages.find((item) => item.id === id);
+      await updateRecord("supportMessages", id, {
+        status: message.risk === "alto" ? "aprovacao" : "sugerido",
+        suggested_reply: suggestedReplyFor(message.category, message.message)
+      });
+      saveState();
+      render();
+      toast("Resposta sugerida.");
+    }
+    if (action === "markResponded") {
+      const message = state.supportMessages.find((item) => item.id === id);
+      await updateRecord("supportMessages", id, {
+        status: "respondido",
+        final_reply: message.suggested_reply || message.final_reply
+      });
+      saveState();
+      render();
+      toast("Mensagem marcada como respondida.");
+    }
+    if (action === "supportToFaq") {
+      const message = state.supportMessages.find((item) => item.id === id);
+      const created = await createRecord("faqEntries", {
+        site_id: message.site_id,
+        topic: message.category,
+        question: message.message,
+        answer: message.suggested_reply || suggestedReplyFor(message.category, message.message),
+        status: "rascunho"
+      });
+      state.faqEntries = [created, ...state.faqEntries.filter((item) => item.id !== created.id)];
+      saveState();
+      render();
+      toast("FAQ criada como rascunho.");
+    }
+    if (action === "publishFaq") {
+      await updateRecord("faqEntries", id, { status: "publicado" });
+      saveState();
+      render();
+      toast("FAQ marcada como publicada.");
     }
     if (action === "setApproval") {
       await updateRecord("approvals", id, { status, decided_at: new Date().toISOString() });
@@ -1126,6 +1439,11 @@ qs("#contentForm").addEventListener("submit", (event) => {
   addCollectionRecord(event.currentTarget, "content", contentPayload, "Conteudo");
 });
 
+qs("#distributionForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "distribution", distributionPayload, "Distribuicao");
+});
+
 qs("#koinMetricForm").addEventListener("submit", (event) => {
   event.preventDefault();
   addCollectionRecord(event.currentTarget, "koinMetrics", koinMetricPayload, "Metrica de Koins");
@@ -1139,6 +1457,16 @@ qs("#prizeForm").addEventListener("submit", (event) => {
 qs("#approvalForm").addEventListener("submit", (event) => {
   event.preventDefault();
   addCollectionRecord(event.currentTarget, "approvals", approvalPayload, "Aprovacao");
+});
+
+qs("#supportForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "supportMessages", supportPayload, "Mensagem");
+});
+
+qs("#faqForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "faqEntries", faqPayload, "FAQ");
 });
 
 qs("#reportForm").addEventListener("submit", (event) => {
