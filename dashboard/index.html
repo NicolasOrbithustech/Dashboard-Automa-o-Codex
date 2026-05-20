@@ -205,6 +205,29 @@
               <h3 id="social-title">Redes sociais e cadencia</h3>
             </div>
           </div>
+          <form id="socialForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Rede</span><input name="channel" required placeholder="Instagram, TikTok..." /></label>
+            <label class="field"><span>Perfil</span><input name="handle" placeholder="@perfil" /></label>
+            <label class="field"><span>URL</span><input name="profile_url" placeholder="https://..." /></label>
+            <label class="field"><span>Cadencia</span><input name="cadence" placeholder="3 posts/semana" /></label>
+            <label class="field"><span>Posts/mes</span><input name="posts_per_month" type="number" min="0" value="0" /></label>
+            <label class="field"><span>Cliques</span><input name="clicks" type="number" min="0" value="0" /></label>
+            <label class="field"><span>Crescimento %</span><input name="growth" type="number" step="0.1" value="0" /></label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                <option value="ativo">Ativo</option>
+                <option value="pausado">Pausado</option>
+                <option value="atencao">Atencao</option>
+                <option value="inativo">Inativo</option>
+              </select>
+            </label>
+            <label class="field"><span>Proxima acao</span><input name="next_action" placeholder="Planejar calendario" /></label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
           <div id="socialGrid" class="matrix-grid"></div>
         </section>
 
@@ -215,6 +238,33 @@
               <h3 id="automations-title">Automacoes recorrentes</h3>
             </div>
           </div>
+          <form id="automationForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Automacao</span><input name="name" required placeholder="Auditoria diaria" /></label>
+            <label class="field"><span>Agenda</span><input name="schedule" placeholder="Diario 09:00" /></label>
+            <label class="field"><span>Dono</span><input name="owner" placeholder="Codex" /></label>
+            <label class="field"><span>Saida</span><input name="output" placeholder="Relatorio, alerta, rascunho..." /></label>
+            <label class="field">
+              <span>Risco</span>
+              <select name="risk">
+                <option value="baixo">Baixo</option>
+                <option value="medio">Medio</option>
+                <option value="alto">Alto</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                <option value="ativa">Ativa</option>
+                <option value="pausada">Pausada</option>
+                <option value="erro">Erro</option>
+              </select>
+            </label>
+            <label class="field"><span>Proxima acao</span><input name="next_action" placeholder="Conectar webhook" /></label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
           <div id="automationTable" class="data-table"></div>
         </section>
 
@@ -225,6 +275,33 @@
               <h3 id="content-title">Conteudo, SEO e publicacao</h3>
             </div>
           </div>
+          <form id="contentForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Titulo</span><input name="title" required placeholder="Post, email, pagina..." /></label>
+            <label class="field"><span>Canal</span><input name="channel" placeholder="Blog, Instagram, email..." /></label>
+            <label class="field">
+              <span>Status</span>
+              <select name="status">
+                <option value="Rascunho">Rascunho</option>
+                <option value="Aprovacao">Aprovacao</option>
+                <option value="Agendado">Agendado</option>
+                <option value="Publicado">Publicado</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Risco</span>
+              <select name="risk">
+                <option value="baixo">Baixo</option>
+                <option value="medio">Medio</option>
+                <option value="alto">Alto</option>
+              </select>
+            </label>
+            <label class="field"><span>Vencimento</span><input name="due_date" type="date" /></label>
+            <label class="field"><span>Proxima acao</span><input name="next_action" placeholder="Revisar promessa de premio" /></label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
           <div id="contentBoard" class="kanban"></div>
         </section>
 
@@ -234,6 +311,36 @@
               <p class="eyebrow">Economia interna</p>
               <h3 id="koins-title">Koins, premios e alertas</h3>
             </div>
+          </div>
+          <div class="split-forms">
+            <form id="koinMetricForm" class="form-grid panel" autocomplete="off">
+              <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+              <label class="field"><span>Koins emitidos</span><input name="issued" type="number" min="0" value="0" /></label>
+              <label class="field"><span>Koins resgatados</span><input name="redeemed" type="number" min="0" value="0" /></label>
+              <label class="field"><span>Resgates pendentes</span><input name="pending_redemptions" type="number" min="0" value="0" /></label>
+              <label class="field"><span>Alertas antifraude</span><input name="fraud_alerts" type="number" min="0" value="0" /></label>
+              <button class="primary-btn form-submit" type="submit">
+                <svg><use href="#icon-plus"></use></svg><span>Metrica</span>
+              </button>
+            </form>
+            <form id="prizeForm" class="form-grid panel" autocomplete="off">
+              <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+              <label class="field"><span>Premio</span><input name="name" required placeholder="Gift card, cupom..." /></label>
+              <label class="field"><span>Custo Koins</span><input name="cost" type="number" min="0" value="0" /></label>
+              <label class="field"><span>Estoque</span><input name="stock" type="number" min="0" value="0" /></label>
+              <label class="field"><span>Resgates</span><input name="redemptions" type="number" min="0" value="0" /></label>
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  <option value="ok">Ok</option>
+                  <option value="atencao">Atencao</option>
+                  <option value="critico">Critico</option>
+                </select>
+              </label>
+              <button class="primary-btn form-submit" type="submit">
+                <svg><use href="#icon-plus"></use></svg><span>Premio</span>
+              </button>
+            </form>
           </div>
           <div id="coinStats" class="kpi-grid"></div>
           <div id="prizeTable" class="data-table"></div>
@@ -246,6 +353,23 @@
               <h3 id="approvals-title">Fila de aprovacao</h3>
             </div>
           </div>
+          <form id="approvalForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Titulo</span><input name="title" required placeholder="Aprovar campanha" /></label>
+            <label class="field"><span>Tipo</span><input name="type" placeholder="Conteudo, premio, suporte..." /></label>
+            <label class="field"><span>Detalhe</span><input name="detail" placeholder="O que precisa ser decidido" /></label>
+            <label class="field">
+              <span>Risco</span>
+              <select name="risk">
+                <option value="medio">Medio</option>
+                <option value="baixo">Baixo</option>
+                <option value="alto">Alto</option>
+              </select>
+            </label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+            </button>
+          </form>
           <div id="approvalList" class="approval-list"></div>
         </section>
 
@@ -256,6 +380,16 @@
               <h3 id="reports-title">Relatorios e crescimento</h3>
             </div>
           </div>
+          <form id="reportForm" class="form-grid panel" autocomplete="off">
+            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+            <label class="field"><span>Data</span><input name="report_date" type="date" required /></label>
+            <label class="field"><span>Trafego</span><input name="traffic" type="number" min="0" value="0" /></label>
+            <label class="field"><span>Posts</span><input name="posts" type="number" min="0" value="0" /></label>
+            <label class="field"><span>Cadastros</span><input name="signups" type="number" min="0" value="0" /></label>
+            <button class="primary-btn form-submit" type="submit">
+              <svg><use href="#icon-plus"></use></svg><span>Registrar</span>
+            </button>
+          </form>
           <div class="reports-grid">
             <div class="panel">
               <div class="panel-head">
@@ -287,6 +421,14 @@
                 <h4>Politicas de automacao</h4>
                 <span class="muted">O que pode ou nao rodar sozinho</span>
               </div>
+              <form id="ruleForm" class="inline-form" autocomplete="off">
+                <label class="field"><span>Categoria</span><input name="category" placeholder="credenciais" /></label>
+                <label class="field"><span>Regra</span><input name="title" required placeholder="Exige aprovacao humana" /></label>
+                <label class="field"><span>Detalhe</span><input name="detail" placeholder="Quando usar esta regra" /></label>
+                <button class="primary-btn" type="submit">
+                  <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+                </button>
+              </form>
               <div id="rulesList" class="rule-list"></div>
             </div>
             <div class="panel">
@@ -297,7 +439,7 @@
               <div id="vaultList" class="vault-list"></div>
             </div>
           </div>
-          <button class="secondary-btn" id="resetBtn">Limpar dashboard</button>
+          <button class="secondary-btn" id="resetBtn">Limpar cache local</button>
         </section>
 
         <div id="toast" class="toast" role="status" aria-live="polite"></div>

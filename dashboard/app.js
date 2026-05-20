@@ -1,4 +1,4 @@
-const STORAGE_KEY = "koinops-dashboard-v2";
+const STORAGE_KEY = "koinops-dashboard-v3";
 const supabaseConfig = window.KOINOPS_SUPABASE || {};
 
 const seedData = {
@@ -7,29 +7,29 @@ const seedData = {
   automations: [],
   content: [],
   prizes: [],
+  koinMetrics: [],
   approvals: [],
+  reports: [],
+  rules: [],
+  auditLog: [],
   koins: {
     issued: 0,
     redeemed: 0,
     pendingRedemptions: 0,
     fraudAlerts: 0
-  },
-  reports: [
-    { day: "Seg", traffic: 0, posts: 0, signups: 0 },
-    { day: "Ter", traffic: 0, posts: 0, signups: 0 },
-    { day: "Qua", traffic: 0, posts: 0, signups: 0 },
-    { day: "Qui", traffic: 0, posts: 0, signups: 0 },
-    { day: "Sex", traffic: 0, posts: 0, signups: 0 },
-    { day: "Sab", traffic: 0, posts: 0, signups: 0 },
-    { day: "Dom", traffic: 0, posts: 0, signups: 0 }
-  ],
-  rules: [
-    { title: "Pode rodar sozinho", detail: "Auditoria, rascunhos, UTMs, relatorios, alertas e publicacao de conteudo ja aprovado." },
-    { title: "Exige aprovacao humana", detail: "Alterar saldo de Koins, negar premio, bloquear usuario, mudar termos ou responder reclamacao sensivel." },
-    { title: "Credenciais", detail: "Guardar somente referencia ao cofre. Nunca salvar senha ou token aberto no dashboard." },
-    { title: "Publicacao", detail: "Promessas sobre premios, ganhos e prazos entram na fila de aprovacao." }
-  ],
-  auditLog: []
+  }
+};
+
+const tableConfig = {
+  sites: { table: "sites", order: "created_at.desc", normalize: normalizeSites },
+  socials: { table: "social_accounts", order: "created_at.desc", normalize: normalizeSocials },
+  automations: { table: "automations", order: "created_at.desc", normalize: normalizeAutomations },
+  content: { table: "content_items", order: "created_at.desc", normalize: normalizeContent },
+  prizes: { table: "prizes", order: "created_at.desc", normalize: normalizePrizes },
+  koinMetrics: { table: "koin_metrics", order: "measured_at.desc", normalize: normalizeKoinMetrics },
+  approvals: { table: "approvals", order: "created_at.desc", normalize: normalizeApprovals },
+  reports: { table: "report_metrics", order: "report_date.desc,created_at.desc", normalize: normalizeReports },
+  rules: { table: "governance_rules", order: "created_at.desc", normalize: normalizeRules }
 };
 
 let state = loadState();
@@ -58,11 +58,26 @@ function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (!saved) return clone(seedData);
   try {
-    const parsed = JSON.parse(saved);
-    return { ...clone(seedData), ...parsed, sites: normalizeSites(parsed.sites || []) };
+    return normalizeState(JSON.parse(saved));
   } catch {
     return clone(seedData);
   }
+}
+
+function normalizeState(value) {
+  return {
+    ...clone(seedData),
+    ...value,
+    sites: normalizeSites(value.sites || []),
+    socials: normalizeSocials(value.socials || value.social_accounts || []),
+    automations: normalizeAutomations(value.automations || []),
+    content: normalizeContent(value.content || value.content_items || []),
+    prizes: normalizePrizes(value.prizes || []),
+    koinMetrics: normalizeKoinMetrics(value.koinMetrics || value.koin_metrics || []),
+    approvals: normalizeApprovals(value.approvals || []),
+    reports: normalizeReports(value.reports || value.report_metrics || []),
+    rules: normalizeRules(value.rules || value.governance_rules || [])
+  };
 }
 
 function clone(value) {
@@ -137,7 +152,125 @@ function normalizeSites(sites) {
   }));
 }
 
-async function syncSitesFromSupabase(showSuccess = true) {
+function normalizeSocials(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    channel: item.channel || "",
+    handle: item.handle || "",
+    profile_url: item.profile_url || item.url || "",
+    cadence: item.cadence || "",
+    posts_per_month: Number(item.posts_per_month ?? item.posts ?? 0),
+    clicks: Number(item.clicks ?? 0),
+    growth: Number(item.growth ?? 0),
+    status: item.status || "ativo",
+    next_action: item.next_action || item.nextAction || "",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeAutomations(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    name: item.name || "",
+    schedule: item.schedule || "",
+    owner: item.owner || "Codex",
+    output: item.output || "",
+    risk: item.risk || "baixo",
+    status: item.status || "ativa",
+    last_run: item.last_run || item.lastRun || null,
+    next_action: item.next_action || item.nextAction || "",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeContent(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    title: item.title || "",
+    channel: item.channel || "",
+    status: item.status || "Rascunho",
+    risk: item.risk || "baixo",
+    due_date: item.due_date || item.due || null,
+    next_action: item.next_action || item.nextAction || "",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizePrizes(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    name: item.name || "",
+    cost: Number(item.cost ?? 0),
+    stock: Number(item.stock ?? 0),
+    redemptions: Number(item.redemptions ?? 0),
+    status: item.status || "ok",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeKoinMetrics(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    issued: Number(item.issued ?? 0),
+    redeemed: Number(item.redeemed ?? 0),
+    pending_redemptions: Number(item.pending_redemptions ?? item.pendingRedemptions ?? 0),
+    fraud_alerts: Number(item.fraud_alerts ?? item.fraudAlerts ?? 0),
+    measured_at: item.measured_at || item.created_at || new Date().toISOString(),
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeApprovals(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    title: item.title || "",
+    type: item.type || "",
+    detail: item.detail || "",
+    risk: item.risk || "medio",
+    status: item.status || "pendente",
+    decided_at: item.decided_at || null,
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeReports(items) {
+  return items.map((item) => ({
+    id: item.id,
+    site_id: item.site_id || item.siteId || "",
+    report_date: item.report_date || item.date || null,
+    traffic: Number(item.traffic ?? 0),
+    posts: Number(item.posts ?? 0),
+    signups: Number(item.signups ?? 0),
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+function normalizeRules(items) {
+  return items.map((item) => ({
+    id: item.id,
+    category: item.category || "operacao",
+    title: item.title || "",
+    detail: item.detail || "",
+    status: item.status || "ativa",
+    created_at: item.created_at || null,
+    updated_at: item.updated_at || null
+  }));
+}
+
+async function syncAllFromSupabase(showSuccess = true) {
   if (!isSupabaseReady()) {
     syncMode = "local";
     updateSyncStatus("Configure a chave do Supabase", "warn");
@@ -145,8 +278,14 @@ async function syncSitesFromSupabase(showSuccess = true) {
   }
   try {
     updateSyncStatus("Sincronizando...", "info");
-    const rows = await supabaseRequest("sites?select=*&order=created_at.desc");
-    state.sites = normalizeSites(rows);
+    const entries = Object.entries(tableConfig);
+    const results = await Promise.all(entries.map(async ([key, config]) => {
+      const rows = await supabaseRequest(`${config.table}?select=*&order=${config.order}`);
+      return [key, config.normalize(rows)];
+    }));
+    results.forEach(([key, rows]) => {
+      state[key] = rows;
+    });
     saveState();
     syncMode = "supabase";
     render();
@@ -159,45 +298,68 @@ async function syncSitesFromSupabase(showSuccess = true) {
   }
 }
 
-async function createSite(site) {
+async function createRecord(collection, payload) {
+  const config = tableConfig[collection];
+  if (!config) throw new Error("Colecao invalida");
   if (!isSupabaseReady()) {
-    const localSite = { ...site, id: `local-${Date.now()}` };
-    state.sites.unshift(localSite);
+    const localRecord = { ...payload, id: `local-${collection}-${Date.now()}` };
+    state[collection].unshift(localRecord);
     syncMode = "local";
-    return localSite;
+    return localRecord;
   }
-  const [created] = await supabaseRequest("sites", {
+  const [created] = await supabaseRequest(config.table, {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify(site)
+    body: JSON.stringify(payload)
   });
   syncMode = "supabase";
-  return normalizeSites([created])[0];
+  return config.normalize([created])[0];
 }
 
-async function updateSite(id, patch) {
-  if (!isSupabaseReady()) {
-    state.sites = state.sites.map((site) => site.id === id ? { ...site, ...patch } : site);
-    syncMode = "local";
-    return;
-  }
-  await supabaseRequest(`sites?id=eq.${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify(patch)
-  });
-  syncMode = "supabase";
-}
-
-async function deleteSite(id) {
+async function updateRecord(collection, id, patch) {
+  const config = tableConfig[collection];
+  if (!config) throw new Error("Colecao invalida");
   if (isSupabaseReady() && !String(id).startsWith("local-")) {
-    await supabaseRequest(`sites?id=eq.${encodeURIComponent(id)}`, {
+    await supabaseRequest(`${config.table}?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(patch)
+    });
+    syncMode = "supabase";
+  } else {
+    syncMode = "local";
+  }
+  state[collection] = state[collection].map((item) => item.id === id ? { ...item, ...patch } : item);
+}
+
+async function deleteRecord(collection, id) {
+  const config = tableConfig[collection];
+  if (!config) throw new Error("Colecao invalida");
+  if (isSupabaseReady() && !String(id).startsWith("local-")) {
+    await supabaseRequest(`${config.table}?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: { Prefer: "return=minimal" }
     });
     syncMode = "supabase";
+  } else {
+    syncMode = "local";
   }
-  state.sites = state.sites.filter((site) => site.id !== id);
+  state[collection] = state[collection].filter((item) => item.id !== id);
+}
+
+async function createSite(site) {
+  return createRecord("sites", site);
+}
+
+async function updateSite(id, patch) {
+  return updateRecord("sites", id, patch);
+}
+
+async function deleteSite(id) {
+  await deleteRecord("sites", id);
+  ["socials", "automations", "content", "prizes", "koinMetrics", "approvals", "reports"].forEach((key) => {
+    state[key] = state[key].filter((item) => item.site_id !== id);
+  });
 }
 
 function updateSyncStatus(label, type = "info") {
@@ -208,7 +370,7 @@ function updateSyncStatus(label, type = "info") {
 
 function siteName(siteId) {
   if (siteId === "all") return "Todos";
-  return state.sites.find((site) => site.id === siteId)?.name || siteId;
+  return state.sites.find((site) => site.id === siteId)?.name || "Sem site";
 }
 
 function formatDate(value) {
@@ -218,13 +380,24 @@ function formatDate(value) {
   return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function formatShortDate(value) {
+  if (!value) return "Sem data";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function todayValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function statusChip(status) {
   const normalized = String(status).toLowerCase();
-  const type = normalized.includes("ativo") || normalized.includes("aprovado") || normalized.includes("ok")
+  const type = normalized.includes("ativo") || normalized.includes("ativa") || normalized.includes("aprovado") || normalized.includes("ok")
     ? "ok"
-    : normalized.includes("pendente") || normalized.includes("atencao") || normalized.includes("pausado") || normalized.includes("baixo")
+    : normalized.includes("pendente") || normalized.includes("atencao") || normalized.includes("pausado") || normalized.includes("pausada") || normalized.includes("medio") || normalized.includes("baixo")
       ? "warn"
-      : normalized.includes("inativo") || normalized.includes("alto") || normalized.includes("critico") || normalized.includes("risco")
+      : normalized.includes("inativo") || normalized.includes("erro") || normalized.includes("alto") || normalized.includes("critico") || normalized.includes("risco") || normalized.includes("rejeitado")
         ? "risk"
         : "info";
   return `<span class="chip ${type}">${esc(status)}</span>`;
@@ -242,7 +415,7 @@ function matchesSearch(item) {
 }
 
 function matchesSite(item) {
-  return filters.siteId === "all" || item.siteId === filters.siteId || item.id === filters.siteId;
+  return filters.siteId === "all" || item.site_id === filters.siteId || item.siteId === filters.siteId || item.id === filters.siteId;
 }
 
 function filtered(items) {
@@ -251,6 +424,7 @@ function filtered(items) {
 
 function render() {
   renderSiteFilter();
+  renderFormSiteSelects();
   renderKpis();
   renderNextActions();
   renderFunnel();
@@ -276,6 +450,19 @@ function renderSiteFilter() {
   filters.siteId = select.value;
 }
 
+function renderFormSiteSelects() {
+  qsa("[data-site-select]").forEach((select) => {
+    const current = select.value;
+    select.innerHTML = state.sites.length
+      ? state.sites.map((site) => `<option value="${esc(site.id)}">${esc(site.name)}</option>`).join("")
+      : `<option value="">Cadastre um site primeiro</option>`;
+    select.disabled = !state.sites.length;
+    if (state.sites.some((site) => site.id === current)) select.value = current;
+  });
+  const reportDate = qs("#reportForm input[name='report_date']");
+  if (reportDate && !reportDate.value) reportDate.value = todayValue();
+}
+
 function renderKpis() {
   const sites = filtered(state.sites);
   const approvals = filtered(state.approvals).filter((item) => item.status === "pendente");
@@ -284,10 +471,10 @@ function renderKpis() {
   const audited = sites.filter((site) => site.last_audit).length;
   const kpis = [
     { label: "Sites ativos", value: sites.filter((site) => site.status === "ativo").length, hint: `${sites.length} cadastrados` },
-    { label: "Com auditoria", value: audited, hint: "ultima auditoria registrada" },
-    { label: "Aprovacoes", value: approvals.length, hint: "pendentes" },
+    { label: "Redes ativas", value: filtered(state.socials).filter((item) => item.status === "ativo").length, hint: "perfis monitorados" },
     { label: "Automacoes", value: automations.length, hint: "ativas agora" },
-    { label: "Alertas", value: prizeAlerts.length, hint: "premios/estoque" }
+    { label: "Aprovacoes", value: approvals.length, hint: "pendentes" },
+    { label: "Alertas", value: prizeAlerts.length + sites.filter((site) => site.status === "atencao").length, hint: `${audited} sites auditados` }
   ];
   qs("#kpiGrid").innerHTML = kpis.map((item) => `
     <article class="kpi">
@@ -301,17 +488,37 @@ function renderKpis() {
 function renderNextActions() {
   const siteActions = filtered(state.sites).map((site) => ({
     title: site.next_action || "Definir proxima acao",
-    detail: `${site.name} - ${site.status}`,
+    detail: `${site.name} - site`,
     risk: site.status === "atencao" ? "medio" : site.status === "inativo" ? "alto" : "baixo"
+  }));
+  const socialActions = filtered(state.socials).filter((item) => item.next_action).map((item) => ({
+    title: item.next_action,
+    detail: `${siteName(item.site_id)} - ${item.channel}`,
+    risk: item.status === "atencao" ? "medio" : "baixo"
+  }));
+  const automationActions = filtered(state.automations).filter((item) => item.next_action || item.status === "erro").map((item) => ({
+    title: item.next_action || "Revisar automacao com erro",
+    detail: `${siteName(item.site_id)} - ${item.name}`,
+    risk: item.status === "erro" ? "alto" : item.risk
+  }));
+  const contentActions = filtered(state.content).filter((item) => item.status !== "Publicado").map((item) => ({
+    title: item.next_action || `Avancar conteudo: ${item.title}`,
+    detail: `${siteName(item.site_id)} - vence ${formatShortDate(item.due_date)}`,
+    risk: item.risk
   }));
   const approvalActions = filtered(state.approvals)
     .filter((item) => item.status === "pendente")
     .map((item) => ({
       title: item.title,
-      detail: `${siteName(item.siteId)} - ${item.type}`,
+      detail: `${siteName(item.site_id)} - ${item.type}`,
       risk: item.risk
     }));
-  const actions = [...approvalActions, ...siteActions].slice(0, 7);
+  const prizeActions = filtered(state.prizes).filter((item) => item.status !== "ok").map((item) => ({
+    title: `Revisar premio: ${item.name}`,
+    detail: `${siteName(item.site_id)} - estoque ${item.stock}`,
+    risk: item.status === "critico" ? "alto" : "medio"
+  }));
+  const actions = [...approvalActions, ...prizeActions, ...automationActions, ...contentActions, ...socialActions, ...siteActions].slice(0, 8);
   qs("#nextActions").innerHTML = actions.length ? actions.map((item) => `
     <article class="action-row">
       <div>
@@ -323,12 +530,39 @@ function renderNextActions() {
   `).join("") : emptyState("Nenhuma acao encontrada para o filtro atual.");
 }
 
+function currentKoinTotals() {
+  const metrics = filtered(state.koinMetrics);
+  const latestBySite = new Map();
+  metrics.forEach((metric) => {
+    const key = metric.site_id || "global";
+    const current = latestBySite.get(key);
+    if (!current || new Date(metric.measured_at) > new Date(current.measured_at)) latestBySite.set(key, metric);
+  });
+  const latest = [...latestBySite.values()];
+  return latest.reduce((total, metric) => ({
+    issued: total.issued + metric.issued,
+    redeemed: total.redeemed + metric.redeemed,
+    pendingRedemptions: total.pendingRedemptions + metric.pending_redemptions,
+    fraudAlerts: total.fraudAlerts + metric.fraud_alerts
+  }), { issued: 0, redeemed: 0, pendingRedemptions: 0, fraudAlerts: 0 });
+}
+
+function currentReportTotals() {
+  return filtered(state.reports).reduce((total, item) => ({
+    traffic: total.traffic + item.traffic,
+    posts: total.posts + item.posts,
+    signups: total.signups + item.signups
+  }), { traffic: 0, posts: 0, signups: 0 });
+}
+
 function renderFunnel() {
+  const reportTotals = currentReportTotals();
+  const koins = currentKoinTotals();
   const values = [
-    { label: "Cadastros", value: state.sites.length, max: Math.max(5, state.sites.length), color: "green" },
-    { label: "Pesquisas", value: 0, max: 100, color: "" },
-    { label: "Koins", value: state.koins.issued, max: Math.max(100, state.koins.issued), color: "amber" },
-    { label: "Resgates", value: state.koins.pendingRedemptions, max: 120, color: "" }
+    { label: "Cadastros", value: reportTotals.signups, max: Math.max(10, reportTotals.signups), color: "green" },
+    { label: "Trafego", value: reportTotals.traffic, max: Math.max(100, reportTotals.traffic), color: "" },
+    { label: "Koins", value: koins.issued, max: Math.max(100, koins.issued), color: "amber" },
+    { label: "Resgates", value: koins.pendingRedemptions, max: Math.max(20, koins.pendingRedemptions), color: "" }
   ];
   qs("#funnelChart").innerHTML = values.map((item) => `
     <div class="bar-row">
@@ -352,10 +586,10 @@ function renderSites() {
       esc(site.api_type),
       esc(formatDate(site.last_audit)),
       esc(site.next_action),
-      `<div class="row-actions">
-        <button class="mini-btn" data-action="auditSite" data-id="${esc(site.id)}">Auditar</button>
-        <button class="mini-btn reject" data-action="deleteSite" data-id="${esc(site.id)}">Excluir</button>
-      </div>`
+      rowActions([
+        miniButton("auditSite", site.id, "Auditar"),
+        miniButton("deleteSite", site.id, "Excluir", "reject")
+      ])
     ])
   );
 }
@@ -366,14 +600,19 @@ function renderSocial() {
     <article class="matrix-item">
       <div>
         <h4>${esc(item.channel)}</h4>
-        <p class="muted">${esc(siteName(item.siteId))} - ${esc(item.handle)}</p>
+        <p class="muted">${esc(siteName(item.site_id))} - ${esc(item.handle || "sem perfil")}</p>
       </div>
       <div>${statusChip(item.status)}</div>
       <div class="metric-pair">
-        <div><strong>${esc(item.posts)}</strong><span>posts/mes</span></div>
+        <div><strong>${esc(item.posts_per_month)}</strong><span>posts/mes</span></div>
         <div><strong>${esc(item.clicks)}</strong><span>cliques</span></div>
       </div>
-      <p class="muted">${esc(item.cadence)} - crescimento ${esc(item.growth)}%</p>
+      <p class="muted">${esc(item.cadence || "Sem cadencia")} - crescimento ${esc(item.growth)}%</p>
+      <p class="muted">${esc(item.next_action || "Sem proxima acao")}</p>
+      <div class="row-actions">
+        ${item.profile_url ? `<a class="mini-btn" href="${esc(item.profile_url)}" target="_blank" rel="noreferrer">Abrir</a>` : ""}
+        ${miniButton("deleteRecord", item.id, "Excluir", "reject", "socials")}
+      </div>
     </article>
   `).join("") : emptyState("Nenhuma rede encontrada para o filtro atual.");
 }
@@ -381,18 +620,20 @@ function renderSocial() {
 function renderAutomations() {
   const automations = filtered(state.automations);
   qs("#automationTable").innerHTML = tableMarkup(
-    ["Automacao", "Agenda", "Dono", "Risco", "Status", "Ultima execucao", "Acoes"],
+    ["Automacao", "Agenda", "Dono", "Risco", "Status", "Ultima execucao", "Proxima acao", "Acoes"],
     automations.map((item) => [
-      cellTitle(item.name, `${siteName(item.siteId)} - ${item.output}`),
+      cellTitle(item.name, `${siteName(item.site_id)} - ${item.output || "sem saida definida"}`),
       esc(item.schedule),
       esc(item.owner),
       riskChip(item.risk),
       statusChip(item.status),
-      esc(item.lastRun),
-      `<div class="row-actions">
-        <button class="mini-btn" data-action="toggleAutomation" data-id="${esc(item.id)}">${item.status === "ativa" ? "Pausar" : "Ativar"}</button>
-        <button class="mini-btn" data-action="runAutomation" data-id="${esc(item.id)}">Rodar</button>
-      </div>`
+      esc(formatDate(item.last_run)),
+      esc(item.next_action),
+      rowActions([
+        miniButton("toggleAutomation", item.id, item.status === "ativa" ? "Pausar" : "Ativar"),
+        miniButton("runAutomation", item.id, "Rodar"),
+        miniButton("deleteRecord", item.id, "Excluir", "reject", "automations")
+      ])
     ])
   );
 }
@@ -407,10 +648,12 @@ function renderContent() {
         ${columnItems.map((item) => `
           <article class="content-item" data-risk="${esc(item.risk)}">
             <h5>${esc(item.title)}</h5>
-            <p>${esc(siteName(item.siteId))} - ${esc(item.channel)} - vence ${esc(item.due)}</p>
+            <p>${esc(siteName(item.site_id))} - ${esc(item.channel || "sem canal")} - vence ${esc(formatShortDate(item.due_date))}</p>
+            <p>${esc(item.next_action || "Sem proxima acao")}</p>
             <div class="row-actions">
               ${riskChip(item.risk)}
               ${nextContentButton(item)}
+              ${miniButton("deleteRecord", item.id, "Excluir", "reject", "content")}
             </div>
           </article>
         `).join("") || `<p class="muted">Sem itens.</p>`}
@@ -423,16 +666,17 @@ function nextContentButton(item) {
   const index = columns.indexOf(item.status);
   if (index < 0 || index === columns.length - 1) return "";
   const label = index === 1 ? "Aprovar" : "Avancar";
-  return `<button class="mini-btn approve" data-action="advanceContent" data-id="${esc(item.id)}">${label}</button>`;
+  return miniButton("advanceContent", item.id, label, "approve");
 }
 
 function renderKoins() {
   const prizes = filtered(state.prizes);
+  const koins = currentKoinTotals();
   const coinKpis = [
-    { label: "Koins emitidos", value: state.koins.issued.toLocaleString("pt-BR"), hint: "total acumulado" },
-    { label: "Koins resgatados", value: state.koins.redeemed.toLocaleString("pt-BR"), hint: "premios pagos" },
-    { label: "Resgates pendentes", value: state.koins.pendingRedemptions, hint: "requerem acompanhamento" },
-    { label: "Alertas antifraude", value: state.koins.fraudAlerts, hint: "fila de revisao" },
+    { label: "Koins emitidos", value: koins.issued.toLocaleString("pt-BR"), hint: "ultima metrica por site" },
+    { label: "Koins resgatados", value: koins.redeemed.toLocaleString("pt-BR"), hint: "premios pagos" },
+    { label: "Resgates pendentes", value: koins.pendingRedemptions, hint: "requerem acompanhamento" },
+    { label: "Alertas antifraude", value: koins.fraudAlerts, hint: "fila de revisao" },
     { label: "Premios criticos", value: prizes.filter((item) => item.status === "critico").length, hint: "estoque muito baixo" }
   ];
   qs("#coinStats").innerHTML = coinKpis.map((item) => `
@@ -443,14 +687,15 @@ function renderKoins() {
     </article>
   `).join("");
   qs("#prizeTable").innerHTML = tableMarkup(
-    ["Premio", "Projeto", "Custo", "Estoque", "Resgates", "Status"],
+    ["Premio", "Projeto", "Custo", "Estoque", "Resgates", "Status", "Acoes"],
     prizes.map((item) => [
       esc(item.name),
-      esc(siteName(item.siteId)),
+      esc(siteName(item.site_id)),
       `${item.cost.toLocaleString("pt-BR")} Koins`,
       esc(item.stock),
       esc(item.redemptions),
-      statusChip(item.status)
+      statusChip(item.status),
+      rowActions([miniButton("deleteRecord", item.id, "Excluir", "reject", "prizes")])
     ])
   );
 }
@@ -461,7 +706,7 @@ function renderApprovals() {
     <article class="approval-row">
       <div>
         <h5>${esc(item.title)}</h5>
-        <p>${esc(siteName(item.siteId))} - ${esc(item.detail)}</p>
+        <p>${esc(siteName(item.site_id))} - ${esc(item.type || "sem tipo")} - ${esc(item.detail)}</p>
       </div>
       <div class="row-actions">
         ${riskChip(item.risk)}
@@ -470,50 +715,71 @@ function renderApprovals() {
           <button class="mini-btn approve" data-action="setApproval" data-id="${esc(item.id)}" data-status="aprovado">Aprovar</button>
           <button class="mini-btn reject" data-action="setApproval" data-id="${esc(item.id)}" data-status="rejeitado">Rejeitar</button>
         ` : ""}
+        ${miniButton("deleteRecord", item.id, "Excluir", "reject", "approvals")}
       </div>
     </article>
   `).join("") : emptyState("Nenhuma aprovacao encontrada para o filtro atual.");
 }
 
+function reportSeries() {
+  const byDay = new Map();
+  filtered(state.reports).forEach((item) => {
+    const key = item.report_date || todayValue();
+    const current = byDay.get(key) || { report_date: key, traffic: 0, posts: 0, signups: 0 };
+    current.traffic += item.traffic;
+    current.posts += item.posts;
+    current.signups += item.signups;
+    byDay.set(key, current);
+  });
+  const series = [...byDay.values()].sort((a, b) => new Date(a.report_date) - new Date(b.report_date)).slice(-7);
+  if (series.length) return series;
+  return ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map((day) => ({ label: day, traffic: 0, posts: 0, signups: 0 }));
+}
+
 function renderReports() {
-  const maxTotal = Math.max(1, ...state.reports.map((item) => item.traffic + item.posts + item.signups));
-  qs("#tractionChart").innerHTML = state.reports.map((item) => {
+  const series = reportSeries();
+  const maxTotal = Math.max(1, ...series.map((item) => item.traffic + item.posts + item.signups));
+  qs("#tractionChart").innerHTML = series.map((item) => {
     const traffic = Math.round(item.traffic / maxTotal * 100);
     const posts = Math.round(item.posts / maxTotal * 100);
     const signups = Math.round(item.signups / maxTotal * 100);
     return `
       <div class="line-bar">
-        <div class="line-stack" title="${esc(item.day)}">
+        <div class="line-stack" title="${esc(item.report_date || item.label)}">
           <em style="height:${signups}%"></em>
           <i style="height:${posts}%"></i>
           <b style="height:${traffic}%"></b>
         </div>
-        <span>${esc(item.day)}</span>
+        <span>${esc(item.label || formatShortDate(item.report_date))}</span>
       </div>
     `;
   }).join("");
   const last = state.auditLog.at(-1);
   qs("#lastAuditLabel").textContent = last ? last.date : "Sem auditoria";
+  const totals = currentReportTotals();
   const summary = [
     `${state.sites.length} sites cadastrados no inventario principal.`,
-    `${state.sites.filter((site) => site.status === "atencao").length} sites marcados com atencao.`,
-    `${state.sites.filter((site) => site.last_audit).length} sites com ultima auditoria registrada.`,
-    `${state.content.filter((item) => item.status !== "Publicado").length} conteudos em producao.`,
+    `${filtered(state.socials).length} redes acompanhadas no filtro atual.`,
+    `${filtered(state.content).filter((item) => item.status !== "Publicado").length} conteudos em producao.`,
+    `${totals.signups} cadastros registrados em relatorios.`,
     last ? last.summary : "Nenhuma auditoria registrada."
   ];
   qs("#executiveSummary").innerHTML = summary.map((item) => `<article class="action-row"><p>${esc(item)}</p>${statusChip("info")}</article>`).join("");
 }
 
 function renderSettings() {
-  qs("#rulesList").innerHTML = state.rules.map((rule) => `
+  qs("#rulesList").innerHTML = state.rules.length ? filtered(state.rules).map((rule) => `
     <article class="rule-row">
       <div>
         <h5>${esc(rule.title)}</h5>
-        <p>${esc(rule.detail)}</p>
+        <p>${esc(rule.category)} - ${esc(rule.detail)}</p>
       </div>
-      ${statusChip("regra")}
+      <div class="row-actions">
+        ${statusChip(rule.status)}
+        ${miniButton("deleteRecord", rule.id, "Excluir", "reject", "rules")}
+      </div>
     </article>
-  `).join("");
+  `).join("") : emptyState("Nenhuma regra cadastrada.");
   qs("#vaultList").innerHTML = state.sites.length ? state.sites.map((site) => `
     <article class="vault-row">
       <div>
@@ -539,11 +805,19 @@ function cellTitle(title, subtitle) {
   return `<div class="cell-title"><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>`;
 }
 
+function rowActions(buttons) {
+  return `<div class="row-actions">${buttons.join("")}</div>`;
+}
+
+function miniButton(action, id, label, className = "", collection = "") {
+  return `<button class="mini-btn ${esc(className)}" data-action="${esc(action)}" data-id="${esc(id)}" ${collection ? `data-collection="${esc(collection)}"` : ""}>${esc(label)}</button>`;
+}
+
 function emptyState(message) {
   return `
     <div class="panel">
       <p class="muted">${esc(message)}</p>
-      <p class="muted">Comece cadastrando um site na aba Sites ou sincronize o Supabase.</p>
+      <p class="muted">Use o formulario desta aba para criar o primeiro registro.</p>
     </div>
   `;
 }
@@ -563,16 +837,45 @@ function toast(message) {
   toast.timeout = window.setTimeout(() => node.classList.remove("show"), 2600);
 }
 
+function formString(data, name, fallback = "") {
+  return String(data.get(name) || fallback).trim();
+}
+
+function formNumber(data, name) {
+  return Number(data.get(name) || 0);
+}
+
+function requireSite(data) {
+  const siteId = formString(data, "site_id");
+  if (!siteId) throw new Error("Cadastre e selecione um site primeiro.");
+  return siteId;
+}
+
+async function addCollectionRecord(form, collection, payloadFactory, successLabel) {
+  const data = new FormData(form);
+  try {
+    const payload = payloadFactory(data);
+    const created = await createRecord(collection, payload);
+    state[collection] = [created, ...state[collection].filter((item) => item.id !== created.id)];
+    saveState();
+    form.reset();
+    render();
+    toast(syncMode === "supabase" ? `${successLabel} salvo no Supabase.` : `${successLabel} salvo no modo local.`);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 async function addSite(form) {
   const data = new FormData(form);
   const site = {
-    name: data.get("name").trim(),
-    url: data.get("url").trim(),
-    objective: data.get("objective").trim(),
-    status: data.get("status"),
-    vault_reference: data.get("vault_reference").trim(),
-    api_type: data.get("api_type").trim(),
-    next_action: data.get("next_action").trim()
+    name: formString(data, "name"),
+    url: formString(data, "url"),
+    objective: formString(data, "objective"),
+    status: formString(data, "status", "ativo"),
+    vault_reference: formString(data, "vault_reference"),
+    api_type: formString(data, "api_type"),
+    next_action: formString(data, "next_action")
   };
 
   try {
@@ -589,11 +892,102 @@ async function addSite(form) {
   }
 }
 
+function socialPayload(data) {
+  return {
+    site_id: requireSite(data),
+    channel: formString(data, "channel"),
+    handle: formString(data, "handle"),
+    profile_url: formString(data, "profile_url"),
+    cadence: formString(data, "cadence"),
+    posts_per_month: formNumber(data, "posts_per_month"),
+    clicks: formNumber(data, "clicks"),
+    growth: formNumber(data, "growth"),
+    status: formString(data, "status", "ativo"),
+    next_action: formString(data, "next_action")
+  };
+}
+
+function automationPayload(data) {
+  return {
+    site_id: requireSite(data),
+    name: formString(data, "name"),
+    schedule: formString(data, "schedule"),
+    owner: formString(data, "owner", "Codex"),
+    output: formString(data, "output"),
+    risk: formString(data, "risk", "baixo"),
+    status: formString(data, "status", "ativa"),
+    next_action: formString(data, "next_action")
+  };
+}
+
+function contentPayload(data) {
+  return {
+    site_id: requireSite(data),
+    title: formString(data, "title"),
+    channel: formString(data, "channel"),
+    status: formString(data, "status", "Rascunho"),
+    risk: formString(data, "risk", "baixo"),
+    due_date: formString(data, "due_date") || null,
+    next_action: formString(data, "next_action")
+  };
+}
+
+function koinMetricPayload(data) {
+  return {
+    site_id: requireSite(data),
+    issued: formNumber(data, "issued"),
+    redeemed: formNumber(data, "redeemed"),
+    pending_redemptions: formNumber(data, "pending_redemptions"),
+    fraud_alerts: formNumber(data, "fraud_alerts"),
+    measured_at: new Date().toISOString()
+  };
+}
+
+function prizePayload(data) {
+  return {
+    site_id: requireSite(data),
+    name: formString(data, "name"),
+    cost: formNumber(data, "cost"),
+    stock: formNumber(data, "stock"),
+    redemptions: formNumber(data, "redemptions"),
+    status: formString(data, "status", "ok")
+  };
+}
+
+function approvalPayload(data) {
+  return {
+    site_id: requireSite(data),
+    title: formString(data, "title"),
+    type: formString(data, "type"),
+    detail: formString(data, "detail"),
+    risk: formString(data, "risk", "medio"),
+    status: "pendente"
+  };
+}
+
+function reportPayload(data) {
+  return {
+    site_id: requireSite(data),
+    report_date: formString(data, "report_date") || todayValue(),
+    traffic: formNumber(data, "traffic"),
+    posts: formNumber(data, "posts"),
+    signups: formNumber(data, "signups")
+  };
+}
+
+function rulePayload(data) {
+  return {
+    category: formString(data, "category", "operacao"),
+    title: formString(data, "title"),
+    detail: formString(data, "detail"),
+    status: "ativa"
+  };
+}
+
 async function auditSite(id) {
   const stamp = new Date().toISOString();
   try {
     await updateSite(id, { last_audit: stamp });
-    state.sites = state.sites.map((site) => site.id === id ? { ...site, last_audit: stamp } : site);
     state.auditLog.push({
       date: formatDate(stamp),
       summary: `Auditoria registrada para ${siteName(id)}.`
@@ -610,7 +1004,6 @@ async function runAudit() {
   const stamp = new Date().toISOString();
   try {
     await Promise.all(filtered(state.sites).map((site) => updateSite(site.id, { last_audit: stamp })));
-    state.sites = state.sites.map((site) => matchesSite(site) ? { ...site, last_audit: stamp } : site);
     state.auditLog.push({
       date: formatDate(stamp),
       summary: "Auditoria registrada nos sites do filtro atual."
@@ -640,7 +1033,7 @@ function importJson(file) {
     try {
       const incoming = JSON.parse(reader.result);
       if (!Array.isArray(incoming.sites)) throw new Error("Arquivo invalido");
-      state = { ...clone(seedData), ...incoming, sites: normalizeSites(incoming.sites) };
+      state = normalizeState(incoming);
       saveState();
       filters.siteId = "all";
       render();
@@ -660,57 +1053,102 @@ document.addEventListener("click", async (event) => {
   }
 
   const actionButton = event.target.closest("[data-action]");
-  if (actionButton) {
-    const { action, id, status } = actionButton.dataset;
+  if (!actionButton) return;
+
+  const { action, id, status, collection } = actionButton.dataset;
+  try {
     if (action === "auditSite") {
       await auditSite(id);
     }
     if (action === "deleteSite") {
-      try {
-        await deleteSite(id);
-        saveState();
-        filters.siteId = "all";
-        render();
-        toast("Site excluido.");
-      } catch (error) {
-        toast(`Nao foi possivel excluir: ${error.message}`);
-      }
+      await deleteSite(id);
+      saveState();
+      filters.siteId = "all";
+      render();
+      toast("Site excluido.");
+    }
+    if (action === "deleteRecord") {
+      await deleteRecord(collection, id);
+      saveState();
+      render();
+      toast("Registro excluido.");
     }
     if (action === "toggleAutomation") {
       const automation = state.automations.find((item) => item.id === id);
-      automation.status = automation.status === "ativa" ? "pausada" : "ativa";
+      const nextStatus = automation.status === "ativa" ? "pausada" : "ativa";
+      await updateRecord("automations", id, { status: nextStatus });
       saveState();
       render();
       toast("Automacao atualizada.");
     }
     if (action === "runAutomation") {
-      const automation = state.automations.find((item) => item.id === id);
-      automation.lastRun = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+      await updateRecord("automations", id, { last_run: new Date().toISOString(), status: "ativa" });
       saveState();
       render();
-      toast("Execucao simulada registrada.");
+      toast("Execucao registrada.");
     }
     if (action === "advanceContent") {
       const content = state.content.find((item) => item.id === id);
       const next = columns[columns.indexOf(content.status) + 1];
-      content.status = next || content.status;
+      await updateRecord("content", id, { status: next || content.status });
       saveState();
       render();
       toast("Conteudo avancou na esteira.");
     }
     if (action === "setApproval") {
-      const approval = state.approvals.find((item) => item.id === id);
-      approval.status = status;
+      await updateRecord("approvals", id, { status, decided_at: new Date().toISOString() });
       saveState();
       render();
       toast(`Item ${status}.`);
     }
+  } catch (error) {
+    toast(error.message);
   }
 });
 
 qs("#siteForm").addEventListener("submit", (event) => {
   event.preventDefault();
   addSite(event.currentTarget);
+});
+
+qs("#socialForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "socials", socialPayload, "Rede");
+});
+
+qs("#automationForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "automations", automationPayload, "Automacao");
+});
+
+qs("#contentForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "content", contentPayload, "Conteudo");
+});
+
+qs("#koinMetricForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "koinMetrics", koinMetricPayload, "Metrica de Koins");
+});
+
+qs("#prizeForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "prizes", prizePayload, "Premio");
+});
+
+qs("#approvalForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "approvals", approvalPayload, "Aprovacao");
+});
+
+qs("#reportForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "reports", reportPayload, "Relatorio");
+});
+
+qs("#ruleForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addCollectionRecord(event.currentTarget, "rules", rulePayload, "Regra");
 });
 
 qs("#searchInput").addEventListener("input", (event) => {
@@ -724,7 +1162,7 @@ qs("#siteFilter").addEventListener("change", (event) => {
 });
 
 qs("#runAuditBtn").addEventListener("click", runAudit);
-qs("#syncBtn").addEventListener("click", () => syncSitesFromSupabase(true));
+qs("#syncBtn").addEventListener("click", () => syncAllFromSupabase(true));
 qs("#exportBtn").addEventListener("click", exportJson);
 qs("#importBtn").addEventListener("click", () => qs("#importFile").click());
 qs("#importFile").addEventListener("change", (event) => {
@@ -738,7 +1176,7 @@ qs("#resetBtn").addEventListener("click", () => {
   qs("#searchInput").value = "";
   saveState();
   render();
-  toast("Dashboard limpo localmente.");
+  toast("Cache local limpo.");
 });
 qs("#addSiteQuickBtn").addEventListener("click", () => {
   switchView("sites");
@@ -746,4 +1184,4 @@ qs("#addSiteQuickBtn").addEventListener("click", () => {
 });
 
 render();
-syncSitesFromSupabase(false);
+syncAllFromSupabase(false);
