@@ -30,6 +30,10 @@ async function supabase(path, options = {}) {
   return response.json();
 }
 
+function cleanBufferChannelId(value) {
+  return String(value || "").trim().split(/\s+/)[0] || "";
+}
+
 async function bufferGraphql(query, variables = {}) {
   const response = await fetch(BUFFER_ENDPOINT, {
     method: "POST",
@@ -66,7 +70,7 @@ function mediaAsset(url) {
 }
 
 function buildPostInput(task, content) {
-  const channelId = task.buffer_channel_id;
+  const channelId = cleanBufferChannelId(task.buffer_channel_id);
   const text = [content?.body || content?.title || task.note, task.utm_url]
     .filter(Boolean)
     .join("\n\n");

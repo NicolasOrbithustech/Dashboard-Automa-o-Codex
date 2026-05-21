@@ -115,6 +115,10 @@ function esc(value) {
     .replaceAll("'", "&#039;");
 }
 
+function cleanBufferChannelId(value) {
+  return String(value || "").trim().split(/\s+/)[0] || "";
+}
+
 function isSupabaseReady() {
   return Boolean(
     supabaseConfig.url &&
@@ -169,7 +173,7 @@ function normalizeSocials(items) {
     channel: item.channel || "",
     handle: item.handle || "",
     profile_url: item.profile_url || item.url || "",
-    buffer_channel_id: item.buffer_channel_id || item.bufferChannelId || "",
+    buffer_channel_id: cleanBufferChannelId(item.buffer_channel_id || item.bufferChannelId),
     cadence: item.cadence || "",
     posts_per_month: Number(item.posts_per_month ?? item.posts ?? 0),
     clicks: Number(item.clicks ?? 0),
@@ -226,7 +230,7 @@ function normalizeDistribution(items) {
     site_id: item.site_id || item.siteId || "",
     content_id: item.content_id || item.contentId || "",
     target: item.target || "",
-    buffer_channel_id: item.buffer_channel_id || item.bufferChannelId || "",
+    buffer_channel_id: cleanBufferChannelId(item.buffer_channel_id || item.bufferChannelId),
     buffer_post_id: item.buffer_post_id || item.bufferPostId || "",
     status: item.status || "fila",
     scheduled_for: item.scheduled_for || null,
@@ -1085,7 +1089,7 @@ function socialPayload(data) {
     channel: formString(data, "channel"),
     handle: formString(data, "handle"),
     profile_url: formString(data, "profile_url"),
-    buffer_channel_id: formString(data, "buffer_channel_id"),
+    buffer_channel_id: cleanBufferChannelId(formString(data, "buffer_channel_id")),
     cadence: formString(data, "cadence"),
     posts_per_month: formNumber(data, "posts_per_month"),
     clicks: formNumber(data, "clicks"),
@@ -1131,7 +1135,7 @@ function distributionPayload(data) {
     site_id: requireSite(data),
     content_id: formString(data, "content_id") || null,
     target: formString(data, "target"),
-    buffer_channel_id: formString(data, "buffer_channel_id"),
+    buffer_channel_id: cleanBufferChannelId(formString(data, "buffer_channel_id")),
     status: formString(data, "status", "fila"),
     scheduled_for: formDateTime(data, "scheduled_for"),
     published_at: formString(data, "status") === "publicado" ? new Date().toISOString() : null,
@@ -1154,6 +1158,20 @@ function socialUtmSource(channel) {
     .replace(/^_+|_+$/g, "") || "social";
 }
 
+function contentTargetChannels(content) {
+  const raw = String(content.channel || "").trim();
+  if (!raw || /^(todas|todos|all|social|multicanal)$/i.test(raw)) return [];
+  return raw
+    .split(/[,;/|]+/)
+    .map((item) => socialUtmSource(item))
+    .filter(Boolean);
+}
+
+function contentMatchesSocial(content, social) {
+  const targets = contentTargetChannels(content);
+  return !targets.length || targets.includes(socialUtmSource(social.channel));
+}
+
 function campaignNameFor(content) {
   const date = new Date();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -1164,14 +1182,15 @@ async function createDistributionQueueForContent(content) {
   const targets = state.socials.filter((social) =>
     social.site_id === content.site_id &&
     social.status === "ativo" &&
-    social.buffer_channel_id
+    cleanBufferChannelId(social.buffer_channel_id) &&
+    contentMatchesSocial(content, social)
   );
   const createdItems = [];
 
   for (const target of targets) {
     const alreadyQueued = state.distribution.some((task) =>
       task.content_id === content.id &&
-      task.buffer_channel_id === target.buffer_channel_id &&
+      cleanBufferChannelId(task.buffer_channel_id) === cleanBufferChannelId(target.buffer_channel_id) &&
       task.status !== "erro"
     );
     if (alreadyQueued) continue;
@@ -1182,7 +1201,7 @@ async function createDistributionQueueForContent(content) {
       site_id: content.site_id,
       content_id: content.id,
       target: target.channel,
-      buffer_channel_id: target.buffer_channel_id,
+      buffer_channel_id: cleanBufferChannelId(target.buffer_channel_id),
       status: "fila",
       scheduled_for: content.scheduled_for || null,
       published_at: null,
