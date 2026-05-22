@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dashboard de Automacao - Projetos com Koins</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230f766e'/%3E%3Ctext x='32' y='40' font-size='30' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'%3EK%3C/text%3E%3C/svg%3E" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -123,6 +124,7 @@
           </div>
           <div class="topbar-tools">
             <span class="sync-status" id="syncStatus">Local</span>
+            <span class="sync-status" id="backendStatus">Backend nao testado</span>
             <label class="field search-field">
               <span>Buscar</span>
               <input id="searchInput" type="search" placeholder="site, canal, premio..." />
@@ -280,75 +282,115 @@
         <section id="content" class="view" aria-labelledby="content-title">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Esteira editorial</p>
-              <h3 id="content-title">Conteudo, SEO e publicacao</h3>
+              <p class="eyebrow">Publicacao social</p>
+              <h3 id="content-title">Criar, revisar e publicar posts</h3>
             </div>
           </div>
-          <form id="contentForm" class="form-grid panel" autocomplete="off">
-            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
-            <label class="field"><span>Titulo</span><input name="title" required placeholder="Post, email, pagina..." /></label>
-            <label class="field"><span>Canal</span><input name="channel" placeholder="Blog, Instagram, email..." /></label>
-            <label class="field wide-field"><span>Texto do post</span><textarea name="body" placeholder="Legenda/copy que sera enviada para a rede social"></textarea></label>
-            <label class="field"><span>Midia URL</span><input name="asset_url" placeholder="https://imagem-ou-video..." /></label>
-            <label class="field wide-field"><span>Prompt de melhoria</span><textarea name="improvement_prompt" placeholder="Ex: refazer imagem menos generica, mais premium, com menos texto e mais cara de rede social"></textarea></label>
-            <label class="field wide-field"><span>Notas da revisao</span><textarea name="revision_notes" placeholder="Historico curto do que foi pedido, aprovado ou rejeitado"></textarea></label>
-            <label class="field">
-              <span>Status</span>
-              <select name="status">
-                <option value="Rascunho">Rascunho</option>
-                <option value="Aprovacao">Aprovacao</option>
-                <option value="Agendado">Agendado</option>
-                <option value="Publicado">Publicado</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Risco</span>
-              <select name="risk">
-                <option value="baixo">Baixo</option>
-                <option value="medio">Medio</option>
-                <option value="alto">Alto</option>
-              </select>
-            </label>
-            <label class="field"><span>Vencimento</span><input name="due_date" type="date" /></label>
-            <label class="field"><span>Proxima acao</span><input name="next_action" placeholder="Revisar promessa de premio" /></label>
-            <button class="primary-btn form-submit" type="submit">
-              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
-            </button>
-            <button class="secondary-btn form-submit" id="cancelContentEditBtn" type="button" hidden>Cancelar edicao</button>
+
+          <div class="workflow-strip">
+            <article><strong>1</strong><span>Criar post</span></article>
+            <article><strong>2</strong><span>Revisar imagem e texto</span></article>
+            <article><strong>3</strong><span>Aprovar</span></article>
+            <article><strong>4</strong><span>Buffer publica</span></article>
+          </div>
+
+          <div class="backend-actionbar panel">
+            <div>
+              <h4>Publicador automatico</h4>
+              <p class="muted">Ao aprovar um post, o dashboard cria a fila. O GitHub Actions publica sozinho; com backend conectado voce tambem pode subir imagem e disparar agora.</p>
+            </div>
+            <div class="row-actions">
+              <button class="secondary-btn" id="testBackendBtn" type="button">Testar backend</button>
+              <button class="primary-btn" id="publishNowBtn" type="button">
+                <svg><use href="#icon-play"></use></svg><span>Publicar fila agora</span>
+              </button>
+            </div>
+          </div>
+
+          <form id="contentForm" class="content-editor panel" autocomplete="off">
+            <div class="editor-main">
+              <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+              <label class="field"><span>Titulo interno</span><input name="title" required placeholder="Ex: Threads - chamada Koins" /></label>
+              <label class="field">
+                <span>Publicar em</span>
+                <select name="channel">
+                  <option value="Threads">Threads</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="Tiktok">TikTok</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="Todas">Todas as redes ativas</option>
+                </select>
+              </label>
+              <label class="field wide-field"><span>Legenda do post</span><textarea name="body" placeholder="Texto que sera enviado para a rede social"></textarea></label>
+              <label class="field wide-field"><span>Pedido para melhorar</span><textarea name="improvement_prompt" placeholder="Ex: deixar mais premium, sem pessoa, estilo flat vector, cores verde e dourado"></textarea></label>
+              <label class="field wide-field"><span>Notas da revisao</span><textarea name="revision_notes" placeholder="Historico curto do que foi pedido, aprovado ou rejeitado"></textarea></label>
+            </div>
+
+            <div class="editor-side">
+              <label class="upload-box" for="mediaFileInput">
+                <svg><use href="#icon-upload"></use></svg>
+                <strong>Imagem JPG/PNG</strong>
+                <span>Escolha uma imagem do seu computador</span>
+                <input id="mediaFileInput" name="media_file" type="file" accept="image/png,image/jpeg" />
+              </label>
+              <div id="imagePreview" class="upload-preview" hidden></div>
+              <label class="field"><span>Ou usar URL da imagem</span><input name="asset_url" placeholder="https://imagem-publica.png" /></label>
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  <option value="Rascunho">Rascunho</option>
+                  <option value="Aprovacao">Aprovacao</option>
+                  <option value="Agendado">Agendado</option>
+                  <option value="Publicado">Publicado</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Risco</span>
+                <select name="risk">
+                  <option value="baixo">Baixo</option>
+                  <option value="medio">Medio</option>
+                  <option value="alto">Alto</option>
+                </select>
+              </label>
+              <label class="field"><span>Data alvo</span><input name="due_date" type="date" /></label>
+              <label class="field"><span>Proxima acao</span><input name="next_action" placeholder="Revisar e aprovar" /></label>
+              <button class="primary-btn form-submit" type="submit">
+                <svg><use href="#icon-plus"></use></svg><span>Salvar post</span>
+              </button>
+              <button class="secondary-btn form-submit" id="cancelContentEditBtn" type="button" hidden>Cancelar edicao</button>
+            </div>
           </form>
           <div id="contentBoard" class="kanban"></div>
-          <div class="section-head compact-head">
-            <div>
-              <p class="eyebrow">Publicacao</p>
-              <h3>Fila de distribuicao</h3>
-            </div>
-          </div>
-          <form id="distributionForm" class="form-grid panel" autocomplete="off">
-            <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
-            <label class="field"><span>Conteudo aprovado</span><select name="content_id" data-content-select></select></label>
-            <label class="field"><span>Destino</span><input name="target" required placeholder="Blog, Instagram, email..." /></label>
-            <label class="field"><span>Buffer Channel ID</span><input name="buffer_channel_id" placeholder="copiar da aba Redes" /></label>
-            <label class="field">
-              <span>Status</span>
-              <select name="status">
-                <option value="fila">Fila</option>
-                <option value="rascunho">Rascunho</option>
-                <option value="agendado">Agendado</option>
-                <option value="publicado">Publicado</option>
-                <option value="erro">Erro</option>
-              </select>
-            </label>
-            <label class="field"><span>Agendar para</span><input name="scheduled_for" type="datetime-local" /></label>
-            <label class="field"><span>URL publicada/base</span><input name="published_url" placeholder="https://..." /></label>
-            <label class="field"><span>UTM source</span><input name="utm_source" placeholder="instagram" /></label>
-            <label class="field"><span>UTM medium</span><input name="utm_medium" placeholder="social" /></label>
-            <label class="field"><span>UTM campaign</span><input name="utm_campaign" placeholder="koins_maio" /></label>
-            <label class="field"><span>Observacao</span><input name="note" placeholder="Criar rascunho no CMS" /></label>
-            <button class="primary-btn form-submit" type="submit">
-              <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
-            </button>
-          </form>
-          <div id="distributionTable" class="data-table"></div>
+          <details class="advanced-block">
+            <summary>Fila tecnica de distribuicao</summary>
+            <p class="muted">Normalmente voce nao precisa mexer aqui. Ela nasce sozinha quando um post e aprovado.</p>
+            <form id="distributionForm" class="form-grid panel" autocomplete="off">
+              <label class="field"><span>Site</span><select name="site_id" data-site-select required></select></label>
+              <label class="field"><span>Conteudo aprovado</span><select name="content_id" data-content-select></select></label>
+              <label class="field"><span>Destino</span><input name="target" required placeholder="Instagram, Threads..." /></label>
+              <label class="field"><span>Buffer Channel ID</span><input name="buffer_channel_id" placeholder="copiar da aba Redes" /></label>
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  <option value="fila">Fila</option>
+                  <option value="rascunho">Rascunho</option>
+                  <option value="agendado">Agendado</option>
+                  <option value="publicado">Publicado</option>
+                  <option value="erro">Erro</option>
+                </select>
+              </label>
+              <label class="field"><span>Agendar para</span><input name="scheduled_for" type="datetime-local" /></label>
+              <label class="field"><span>URL publicada/base</span><input name="published_url" placeholder="https://..." /></label>
+              <label class="field"><span>UTM source</span><input name="utm_source" placeholder="instagram" /></label>
+              <label class="field"><span>UTM medium</span><input name="utm_medium" placeholder="social" /></label>
+              <label class="field"><span>UTM campaign</span><input name="utm_campaign" placeholder="koins_maio" /></label>
+              <label class="field"><span>Observacao</span><input name="note" placeholder="Criar rascunho no CMS" /></label>
+              <button class="primary-btn form-submit" type="submit">
+                <svg><use href="#icon-plus"></use></svg><span>Adicionar</span>
+              </button>
+            </form>
+            <div id="distributionTable" class="data-table"></div>
+          </details>
         </section>
 
         <section id="koins" class="view" aria-labelledby="koins-title">
@@ -548,6 +590,23 @@
                 <span class="muted">Sem senhas em texto aberto</span>
               </div>
               <div id="vaultList" class="vault-list"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <h4>Backend seguro</h4>
+                <span class="muted">Upload, teste e publicacao imediata</span>
+              </div>
+              <form id="backendSettingsForm" class="settings-form" autocomplete="off">
+                <label class="field"><span>URL do backend</span><input name="backend_url" placeholder="https://seu-projeto.vercel.app" /></label>
+                <label class="field"><span>Chave do painel</span><input name="backend_token" type="password" placeholder="KOINOPS_ADMIN_TOKEN" /></label>
+                <div class="row-actions">
+                  <button class="secondary-btn" type="submit">Salvar conexao</button>
+                  <button class="primary-btn" id="settingsTestBackendBtn" type="button">
+                    <svg><use href="#icon-play"></use></svg><span>Testar</span>
+                  </button>
+                </div>
+              </form>
+              <p class="muted">A chave do painel fica somente no seu navegador. As API keys reais continuam no backend e no 1Password.</p>
             </div>
           </div>
           <button class="secondary-btn" id="resetBtn">Limpar cache local</button>

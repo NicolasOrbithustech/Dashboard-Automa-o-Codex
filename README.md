@@ -20,6 +20,7 @@ Depois acesse `http://127.0.0.1:8765`.
 - Redes sociais com perfil, cadencia, metricas e proxima acao
 - Automacoes recorrentes com agenda, dono, risco, status, execucao manual e ultima execucao
 - Esteira de conteudo em kanban: Rascunho, Aprovacao, Agendado e Publicado
+- Editor simples de post com upload JPG/PNG via backend seguro
 - Fila de publicacao e distribuicao com agendamento, UTMs e link publicado
 - Koins com snapshots de metricas, premios, estoque, resgates e alertas
 - Fila de aprovacao humana com aprovar/rejeitar
@@ -42,6 +43,7 @@ Depois acesse `http://127.0.0.1:8765`.
 ## Diagnostico e operacao
 
 - `DIAGNOSTICO_AUTOMACAO.md`: mostra o que falta, o que ja foi feito e quais integracoes precisam da sua intervencao.
+- `BACKEND_SETUP.md`: como ativar upload de imagem e publicacao imediata via backend.
 - `operacao/PROMPTS_CODEX.md`: prompts fixos para auditoria, conteudo, risco, relatorio e FAQ.
 - `operacao/FLUXO_CONTEUDO_CODEX.md`: fluxo onde Codex cria, voce aprova e a automacao publica/agenda.
 - `operacao/FLUXO_MELHORIA_POSTS.md`: como pedir ajustes de texto/imagem pelo campo `Prompt de melhoria`.
@@ -52,15 +54,25 @@ Depois acesse `http://127.0.0.1:8765`.
 
 ## Buffer e publicacao social
 
-O dashboard ja tem campos para `Buffer Channel ID`, texto do post e midia. A automacao de envio fica em:
+O dashboard ja tem campos para `Buffer Channel ID`, texto do post e midia. Agora existem duas camadas:
+
+- GitHub Actions publica a fila automaticamente a cada 5 minutos.
+- Backend seguro permite upload JPG/PNG e botao `Publicar fila agora`.
+
+A automacao de envio fica em:
 
 ```txt
+api/publish.js
+api/upload-media.js
+lib/buffer-publisher.mjs
 scripts/buffer-publish.mjs
 .github/workflows/buffer-publish.yml
 .github/workflows/buffer-list-channels.yml
 ```
 
 Para ativar, crie no GitHub Actions o segredo `BUFFER_API_KEY` com a chave salva no 1Password. O workflow `Buffer Publish` roda manualmente e tambem a cada 5 minutos; antes do primeiro envio real, rode uma vez com `dry_run = 1`.
+
+Para ativar upload de imagem, publique o backend e configure as variaveis descritas em `BACKEND_SETUP.md`. Depois preencha `Governanca > Backend seguro` no dashboard.
 
 ## Supabase
 

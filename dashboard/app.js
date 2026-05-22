@@ -1,5 +1,8 @@
 const STORAGE_KEY = "koinops-dashboard-v3";
+const BACKEND_URL_KEY = "koinops-backend-url";
+const BACKEND_TOKEN_KEY = "koinops-backend-token";
 const supabaseConfig = window.KOINOPS_SUPABASE || {};
+const backendConfig = window.KOINOPS_BACKEND || {};
 
 const seedData = {
   sites: [],
@@ -149,6 +152,89 @@ async function supabaseRequest(path, options = {}) {
   }
   if (response.status === 204) return null;
   return response.json();
+}
+
+function configuredBackendUrl() {
+  const saved = localStorage.getItem(BACKEND_URL_KEY);
+  const value = saved || backendConfig.baseUrl || "";
+  if (value) return String(value).trim().replace(/\/+$/, "");
+  const hostname = window.location.hostname;
+  const isLocalStatic = hostname === "localhost" || hostname === "127.0.0.1";
+  const isHostedApp = window.location.protocol.startsWith("http") && !hostname.includes("github.io") && !isLocalStatic;
+  return isHostedApp ? window.location.origin : "";
+}
+
+function backendToken() {
+  return localStorage.getItem(BACKEND_TOKEN_KEY) || "";
+}
+
+function updateBackendStatus(label, type = "info") {
+  const status = qs("#backendStatus");
+  if (!status) return;
+  status.textContent = label;
+  status.dataset.type = type;
+}
+
+async function backendRequest(path, options = {}) {
+  const baseUrl = configuredBackendUrl();
+  if (!baseUrl) throw new Error("Configure a URL do backend em Governanca.");
+  const headers = { ...(options.headers || {}) };
+  if (options.auth !== false) {
+    const token = backendToken();
+    if (!token) throw new Error("Configure a chave do painel em Governanca.");
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Backend ${response.status}`);
+  return payload;
+}
+
+async function testBackend(showToast = true) {
+  try {
+    updateBackendStatus("Testando backend...", "info");
+    const payload = await backendRequest("/api/health", { method: "GET", auth: false });
+    const uploadReady = payload.configured?.upload;
+    const bufferReady = payload.configured?.buffer;
+    const adminReady = payload.configured?.adminToken;
+    const label = uploadReady && bufferReady && adminReady ? "Backend pronto" : "Backend incompleto";
+    updateBackendStatus(label, uploadReady && bufferReady && adminReady ? "ok" : "warn");
+    if (showToast) {
+      toast(`${label}: Buffer ${bufferReady ? "ok" : "pendente"}, upload ${uploadReady ? "ok" : "pendente"}.`);
+    }
+    return payload;
+  } catch (error) {
+    updateBackendStatus("Backend offline", "risk");
+    if (showToast) toast(error.message);
+    return null;
+  }
+}
+
+async function publishQueueNow() {
+  updateBackendStatus("Publicando fila...", "info");
+  const result = await backendRequest("/api/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ limit: 10 })
+  });
+  await syncAllFromSupabase(false);
+  updateBackendStatus("Backend pronto", "ok");
+  toast(result.published ? `${result.published} post(s) enviados ao Buffer.` : "Fila processada. Nenhum post novo publicado.");
+}
+
+async function uploadMediaFile(file) {
+  const form = new FormData();
+  form.append("media_file", file);
+  updateBackendStatus("Enviando imagem...", "info");
+  const result = await backendRequest("/api/upload-media", {
+    method: "POST",
+    body: form
+  });
+  updateBackendStatus("Backend pronto", "ok");
+  return result.media.url;
 }
 
 function normalizeSites(sites) {
@@ -535,6 +621,8 @@ function render() {
   renderReports();
   renderSettings();
   updateSyncStatus(syncMode === "supabase" ? "Supabase conectado" : "Modo local", syncMode === "supabase" ? "ok" : "info");
+  renderBackendSettings();
+  updateBackendStatus(configuredBackendUrl() ? "Backend configurado" : "Backend nao configurado", configuredBackendUrl() ? "info" : "warn");
 }
 
 function renderSiteFilter() {
@@ -793,7 +881,7 @@ function renderContent() {
 
 function nextContentButton(item) {
   if (item.status === "Rascunho") return miniButton("advanceContent", item.id, "Enviar para revisao");
-  if (item.status === "Aprovacao") return miniButton("advanceContent", item.id, "Aprovar e criar fila", "approve");
+  if (item.status === "Aprovacao") return miniButton("advanceContent", item.id, "Aprovar para Buffer", "approve");
   return "";
 }
 
@@ -981,6 +1069,14 @@ function renderSettings() {
   `).join("") : emptyState("Nenhuma referencia de cofre cadastrada.");
 }
 
+function renderBackendSettings() {
+  const form = qs("#backendSettingsForm");
+  if (!form) return;
+  if (document.activeElement && form.contains(document.activeElement)) return;
+  form.elements.backend_url.value = configuredBackendUrl();
+  form.elements.backend_token.value = backendToken();
+}
+
 function tableMarkup(headers, rows) {
   if (!rows.length) return emptyState("Nenhum item encontrado para o filtro atual.");
   return `
@@ -1137,16 +1233,37 @@ function setContentFormMode(contentId = null) {
   const form = qs("#contentForm");
   const submitLabel = qs("#contentForm .primary-btn span");
   const cancel = qs("#cancelContentEditBtn");
-  if (submitLabel) submitLabel.textContent = contentId ? "Salvar edicao" : "Adicionar";
+  if (submitLabel) submitLabel.textContent = contentId ? "Salvar edicao" : "Salvar post";
   if (cancel) cancel.hidden = !contentId;
   form.dataset.editingId = contentId || "";
+}
+
+function setImagePreview(url, label = "Midia selecionada") {
+  const preview = qs("#imagePreview");
+  if (!preview) return;
+  if (!url) {
+    preview.hidden = true;
+    preview.innerHTML = "";
+    return;
+  }
+  preview.hidden = false;
+  preview.innerHTML = `<img src="${esc(url)}" alt="${esc(label)}">`;
 }
 
 function resetContentForm() {
   const form = qs("#contentForm");
   form.reset();
+  setImagePreview("");
   setContentFormMode(null);
   renderFormSiteSelects();
+}
+
+function setSelectValue(select, value) {
+  if (!value) return;
+  if (![...select.options].some((option) => option.value === value)) {
+    select.insertAdjacentHTML("beforeend", `<option value="${esc(value)}">${esc(value)}</option>`);
+  }
+  select.value = value;
 }
 
 function editContent(contentId) {
@@ -1157,7 +1274,7 @@ function editContent(contentId) {
   const form = qs("#contentForm");
   form.elements.site_id.value = content.site_id || "";
   form.elements.title.value = content.title || "";
-  form.elements.channel.value = content.channel || "";
+  setSelectValue(form.elements.channel, content.channel || "");
   form.elements.body.value = content.body || "";
   form.elements.asset_url.value = content.asset_url || "";
   form.elements.improvement_prompt.value = content.improvement_prompt || "";
@@ -1166,6 +1283,7 @@ function editContent(contentId) {
   form.elements.risk.value = content.risk || "baixo";
   form.elements.due_date.value = content.due_date || "";
   form.elements.next_action.value = content.next_action || "";
+  setImagePreview(content.asset_url, content.title);
   setContentFormMode(contentId);
   form.elements.title.focus();
 }
@@ -1173,6 +1291,12 @@ function editContent(contentId) {
 async function saveContent(form) {
   const data = new FormData(form);
   try {
+    const mediaFile = form.elements.media_file?.files?.[0];
+    if (mediaFile) {
+      const uploadedUrl = await uploadMediaFile(mediaFile);
+      data.set("asset_url", uploadedUrl);
+      form.elements.asset_url.value = uploadedUrl;
+    }
     const payload = contentPayload(data);
     if (editingContentId) {
       await updateRecord("content", editingContentId, payload);
@@ -1498,13 +1622,29 @@ document.addEventListener("click", async (event) => {
       if (next === "Agendado") patch.approved_at = new Date().toISOString();
       await updateRecord("content", id, patch);
       const queued = next === "Agendado" ? await createDistributionQueueForContent({ ...content, ...patch }) : [];
+      let publishResult = null;
+      let publishError = "";
+      if (queued.length && configuredBackendUrl() && backendToken()) {
+        try {
+          publishResult = await backendRequest("/api/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ limit: queued.length })
+          });
+          await syncAllFromSupabase(false);
+        } catch (error) {
+          publishError = error.message;
+        }
+      }
       saveState();
       render();
-      const message = next === "Agendado"
-        ? queued.length
-          ? `Conteudo aprovado: ${queued.length} tarefas criadas para Buffer.`
-          : "Conteudo aprovado, mas nenhuma nova tarefa Buffer foi criada."
-        : "Conteudo avancou na esteira.";
+      let message = "Conteudo avancou na esteira.";
+      if (next === "Agendado") {
+        if (!queued.length) message = "Conteudo aprovado, mas nenhuma nova tarefa Buffer foi criada.";
+        else if (publishResult?.published) message = `Conteudo aprovado e ${publishResult.published} post(s) enviados ao Buffer.`;
+        else if (publishError) message = `Fila criada, mas o backend nao publicou: ${publishError}`;
+        else message = `Conteudo aprovado: ${queued.length} tarefa(s) criadas. O GitHub Actions publica sozinho.`;
+      }
       toast(message);
     }
     if (action === "rejectContent") {
@@ -1599,6 +1739,21 @@ qs("#contentForm").addEventListener("submit", (event) => {
 
 qs("#cancelContentEditBtn").addEventListener("click", resetContentForm);
 
+qs("#mediaFileInput").addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  if (!file) {
+    setImagePreview("");
+    return;
+  }
+  if (!["image/jpeg", "image/png"].includes(file.type)) {
+    toast("Envie apenas imagem JPG ou PNG.");
+    event.target.value = "";
+    setImagePreview("");
+    return;
+  }
+  setImagePreview(URL.createObjectURL(file), file.name);
+});
+
 qs("#distributionForm").addEventListener("submit", (event) => {
   event.preventDefault();
   addCollectionRecord(event.currentTarget, "distribution", distributionPayload, "Distribuicao");
@@ -1639,6 +1794,19 @@ qs("#ruleForm").addEventListener("submit", (event) => {
   addCollectionRecord(event.currentTarget, "rules", rulePayload, "Regra");
 });
 
+qs("#backendSettingsForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const backendUrl = formString(data, "backend_url").replace(/\/+$/, "");
+  const token = formString(data, "backend_token");
+  if (backendUrl) localStorage.setItem(BACKEND_URL_KEY, backendUrl);
+  else localStorage.removeItem(BACKEND_URL_KEY);
+  if (token) localStorage.setItem(BACKEND_TOKEN_KEY, token);
+  else localStorage.removeItem(BACKEND_TOKEN_KEY);
+  render();
+  toast("Conexao do backend salva neste navegador.");
+});
+
 qs("#searchInput").addEventListener("input", (event) => {
   filters.search = event.target.value;
   render();
@@ -1651,6 +1819,14 @@ qs("#siteFilter").addEventListener("change", (event) => {
 
 qs("#runAuditBtn").addEventListener("click", runAudit);
 qs("#syncBtn").addEventListener("click", () => syncAllFromSupabase(true));
+qs("#testBackendBtn").addEventListener("click", () => testBackend(true));
+qs("#settingsTestBackendBtn").addEventListener("click", () => testBackend(true));
+qs("#publishNowBtn").addEventListener("click", () => {
+  publishQueueNow().catch((error) => {
+    updateBackendStatus("Backend com erro", "risk");
+    toast(error.message);
+  });
+});
 qs("#exportBtn").addEventListener("click", exportJson);
 qs("#importBtn").addEventListener("click", () => qs("#importFile").click());
 qs("#importFile").addEventListener("change", (event) => {

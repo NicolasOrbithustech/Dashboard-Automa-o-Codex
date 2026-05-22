@@ -1,22 +1,23 @@
 # Diagnostico de Automacao - KoinOps
 
-Data do diagnostico: 2026-05-21
+Data do diagnostico: 2026-05-22
 
 ## Resumo
 
-O dashboard, o Supabase e o GitHub Pages ja estao prontos como base operacional. O que falta agora nao e mais "tela": falta conectar ferramentas externas, criar credenciais tecnicas e ativar rotinas recorrentes do Codex.
+O dashboard, o Supabase, o GitHub Pages e a base de backend ja estao prontos como operacao inicial. O que falta agora e configurar os segredos no ambiente real e fazer o primeiro teste controlado de publicacao.
 
 ## Estado atual
 
 | Area | Status | Diagnostico |
 |---|---|---|
-| Dashboard | Pronto para uso inicial | Publicado no GitHub Pages, com abas operacionais e persistencia no Supabase. |
+| Dashboard | Em ajuste operacional | Publicado no GitHub Pages, com fluxo simplificado de Conteudo, upload JPG/PNG via backend e persistencia no Supabase. |
 | Supabase | Pronto para teste | Tabelas criadas para sites, redes, automacoes, conteudo, distribuicao, Koins, aprovacoes, suporte, FAQ, relatorios e governanca. |
-| Seguranca | Parcial | O dashboard guarda referencia do cofre, mas ainda falta login/RLS por usuario e tokens tecnicos. |
+| Backend | Implementado, pendente de segredos | APIs `health`, `upload-media` e `publish` existem. Falta configurar variaveis no host. |
+| Seguranca | Parcial | O dashboard guarda referencia do cofre; backend usa token simples, mas ainda falta login/RLS por usuario. |
 | Fase 3 - Pasta operacional | Feita agora em template | Criada a pasta `operacao/_template_site` com arquivos base para cada site. |
 | Fase 4 - Auditoria real | Pendente de integracoes | Falta conectar uptime, SSL, SEO, Search Console/Analytics e funil real do site. |
 | Fase 5 - Conteudo automatico | Parcial | Dashboard tem kanban; falta contexto por site preenchido e rotina do Codex para gerar calendario/conteudo. |
-| Fase 6 - Publicacao | Avancada | Fila, UTMs, campos Buffer, script de envio e GitHub Actions existem; falta voce adicionar o segredo `BUFFER_API_KEY` no GitHub e mapear os Channel IDs. |
+| Fase 6 - Publicacao | Avancada | Fila, UTMs, campos Buffer, upload de midia, backend de disparo, script de envio e GitHub Actions existem; falta configurar segredos e testar envio real. |
 | Fase 7 - Suporte | Parcial | Classificacao, resposta sugerida e FAQ existem; falta conectar canais de suporte/redes. |
 | Fase 8 - Koins/premios | Parcial | Metricas e premios existem; falta API real de saldo, resgates e antifraude. |
 | Fase 9 - Relatorios | Parcial | Relatorios manuais existem; falta automacao diaria/semanal/mensal. |
@@ -51,6 +52,7 @@ Contagem real consultada por SQL:
 - Criar checklist de aceite para auditoria, conteudo, suporte, relatorios e publicacao.
 - Documentar quais integracoes faltam e quais permissoes devem ser criadas.
 - Preparar a integracao Buffer com scripts e workflow do GitHub Actions.
+- Criar backend seguro para upload JPG/PNG e disparo imediato da fila aprovada.
 
 ## Intervencoes que preciso de voce
 
@@ -60,6 +62,7 @@ Voce precisa:
 
 - Manter senhas reais no 1Password.
 - Copiar a chave Buffer do 1Password para o segredo `BUFFER_API_KEY` do GitHub Actions.
+- Configurar no backend `KOINOPS_ADMIN_TOKEN`, `BUFFER_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` e demais variaveis de `BACKEND_SETUP.md`.
 - Ativar 2FA em CMS, redes, e-mail, analytics e ferramentas de automacao.
 - Criar usuarios tecnicos separados sempre que a plataforma permitir.
 
