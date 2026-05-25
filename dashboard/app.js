@@ -1235,6 +1235,7 @@ function renderContent() {
             ${item.body ? `<p>${esc(item.body.slice(0, 180))}${item.body.length > 180 ? "..." : ""}</p>` : ""}
             ${item.improvement_prompt ? `<p class="improvement-note"><strong>Melhorar:</strong> ${esc(item.improvement_prompt.slice(0, 220))}${item.improvement_prompt.length > 220 ? "..." : ""}</p>` : ""}
             ${item.revision_notes ? `<p class="revision-note"><strong>Revisao:</strong> ${esc(item.revision_notes.slice(0, 180))}${item.revision_notes.length > 180 ? "..." : ""}</p>` : ""}
+            ${item.scheduled_for ? `<p><strong>Agendado para:</strong> ${esc(formatDate(item.scheduled_for))}</p>` : ""}
             <p>${esc(item.next_action || "Sem proxima acao")}</p>
             ${item.published_url ? `<p><a href="${esc(item.published_url)}" target="_blank" rel="noreferrer">Publicado</a></p>` : ""}
             <div class="row-actions">
@@ -1251,9 +1252,25 @@ function renderContent() {
   }).join("");
 }
 
+function pendingDistributionTasksForContent(contentId) {
+  return state.distribution.filter((task) =>
+    task.content_id === contentId &&
+    ["fila", "agendado"].includes(task.status) &&
+    !task.buffer_post_id
+  );
+}
+
 function nextContentButton(item) {
   if (item.status === "Rascunho") return miniButton("advanceContent", item.id, "Enviar para revisao");
-  if (item.status === "Aprovacao") return miniButton("advanceContent", item.id, "Aprovar para Buffer", "approve");
+  if (item.status === "Aprovacao") {
+    return [
+      miniButton("publishContentNow", item.id, "Postar agora", "approve"),
+      miniButton("scheduleContent", item.id, "Agendar")
+    ].join("");
+  }
+  if (item.status === "Agendado" && pendingDistributionTasksForContent(item.id).length) {
+    return miniButton("publishContentNow", item.id, "Postar agora", "approve");
+  }
   return "";
 }
 
@@ -1522,6 +1539,42 @@ function formDateTime(data, name) {
   return value ? new Date(value).toISOString() : null;
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateTimeLocal(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate())
+  ].join("-") + `T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+}
+
+function readableLocalDateTime(value) {
+  return toDateTimeLocal(value).replace("T", " ");
+}
+
+function defaultScheduleDate() {
+  const date = new Date(Date.now() + 60 * 60 * 1000);
+  date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0);
+  return date;
+}
+
+function parseScheduleInput(value) {
+  const raw = String(value || "").trim();
+  if (!raw) throw new Error("Informe data e hora para agendar.");
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) throw new Error("Use uma data valida no formato AAAA-MM-DD HH:mm.");
+  if (date.getTime() < Date.now() + 60 * 1000) {
+    throw new Error("Para publicar agora use o botao Postar agora. Para agendar, escolha um horario futuro.");
+  }
+  return date.toISOString();
+}
+
 function requireSite(data) {
   const siteId = formString(data, "site_id");
   if (!siteId) throw new Error("Cadastre e selecione um site primeiro.");
@@ -1608,6 +1661,7 @@ function contentPayload(data) {
     status: formString(data, "status", "Rascunho"),
     risk: formString(data, "risk", "baixo"),
     due_date: formString(data, "due_date") || null,
+    scheduled_for: formDateTime(data, "scheduled_for"),
     next_action: formString(data, "next_action"),
     improvement_prompt: formString(data, "improvement_prompt"),
     revision_notes: formString(data, "revision_notes")
@@ -1671,6 +1725,7 @@ function editContent(contentId) {
   form.elements.status.value = content.status || "Rascunho";
   form.elements.risk.value = content.risk || "baixo";
   form.elements.due_date.value = content.due_date || "";
+  form.elements.scheduled_for.value = content.scheduled_for ? toDateTimeLocal(content.scheduled_for) : "";
   form.elements.next_action.value = content.next_action || "";
   setImagePreview(content.asset_url, content.title);
   setContentFormMode(contentId);
@@ -1758,7 +1813,8 @@ function campaignNameFor(content) {
   return `${socialUtmSource(siteName(content.site_id))}_${date.getFullYear()}_${month}`;
 }
 
-async function createDistributionQueueForContent(content) {
+async function createDistributionQueueForContent(content, options = {}) {
+  const scheduledFor = options.scheduledFor === undefined ? content.scheduled_for || null : options.scheduledFor;
   const targets = state.socials.filter((social) =>
     social.site_id === content.site_id &&
     social.status === "ativo" &&
@@ -1783,7 +1839,7 @@ async function createDistributionQueueForContent(content) {
       target: target.channel,
       buffer_channel_id: cleanBufferChannelId(target.buffer_channel_id),
       status: "fila",
-      scheduled_for: content.scheduled_for || null,
+      scheduled_for: scheduledFor,
       published_at: null,
       published_url: publishedUrl,
       utm_source: utmSource,
@@ -1797,6 +1853,103 @@ async function createDistributionQueueForContent(content) {
   }
 
   return createdItems;
+}
+
+function requireContentItem(contentId) {
+  const content = state.content.find((item) => item.id === contentId);
+  if (!content) throw new Error("Conteudo nao encontrado.");
+  return content;
+}
+
+function taskIds(tasks) {
+  return tasks.map((task) => task.id).filter(Boolean);
+}
+
+async function updatePendingTaskSchedule(contentId, scheduledFor) {
+  const tasks = pendingDistributionTasksForContent(contentId);
+  for (const task of tasks) {
+    if (String(task.scheduled_for || "") !== String(scheduledFor || "") || task.status !== "fila") {
+      await updateRecord("distribution", task.id, {
+        status: "fila",
+        scheduled_for: scheduledFor,
+        error_message: null
+      });
+    }
+  }
+  return pendingDistributionTasksForContent(contentId);
+}
+
+async function sendContentTasksToBackend(contentId, tasks, publishMode) {
+  if (!tasks.length) throw new Error("Nenhuma tarefa pendente para enviar ao Buffer.");
+  updateBackendStatus(publishMode === "now" ? "Postando agora..." : "Agendando no Buffer...", "info");
+  const result = await backendRequest("/api/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      publish_mode: publishMode,
+      content_id: contentId,
+      task_ids: taskIds(tasks),
+      limit: tasks.length
+    })
+  });
+  await syncAllFromSupabase(false);
+  updateBackendStatus("Backend pronto", "ok");
+  return result;
+}
+
+async function publishContentNow(contentId) {
+  const content = requireContentItem(contentId);
+  const now = new Date().toISOString();
+  const patch = {
+    approved_at: content.approved_at || now,
+    scheduled_for: null,
+    next_action: "Publicacao imediata solicitada"
+  };
+  await updateRecord("content", contentId, patch);
+  await createDistributionQueueForContent({ ...content, ...patch }, { scheduledFor: null });
+  await updatePendingTaskSchedule(contentId, null);
+  saveState();
+  render();
+
+  const tasks = pendingDistributionTasksForContent(contentId);
+  if (!tasks.length) {
+    throw new Error("Nao encontrei tarefa pendente. Se esse post ja foi enviado ao Buffer, edite ou cancele por la para evitar duplicar.");
+  }
+
+  const result = await sendContentTasksToBackend(contentId, tasks, "now");
+  const sent = result.results?.filter((item) => item.sharedNow || item.bufferPostId).length || result.published || 0;
+  toast(sent ? `${sent} post(s) enviados para publicacao imediata.` : "Nenhum post novo foi publicado. Confira a fila tecnica.");
+}
+
+async function scheduleContent(contentId) {
+  const content = requireContentItem(contentId);
+  const defaultValue = readableLocalDateTime(content.scheduled_for || defaultScheduleDate());
+  const answer = window.prompt("Quando publicar? Use horario local no formato AAAA-MM-DD HH:mm.", defaultValue);
+  if (answer === null) {
+    toast("Agendamento cancelado.");
+    return;
+  }
+  const scheduledFor = parseScheduleInput(answer);
+  const patch = {
+    status: "Agendado",
+    approved_at: content.approved_at || new Date().toISOString(),
+    scheduled_for: scheduledFor,
+    next_action: "Agendado no Buffer"
+  };
+  await updateRecord("content", contentId, patch);
+  await createDistributionQueueForContent({ ...content, ...patch }, { scheduledFor });
+  await updatePendingTaskSchedule(contentId, scheduledFor);
+  saveState();
+  render();
+
+  const tasks = pendingDistributionTasksForContent(contentId);
+  if (!tasks.length) {
+    toast("Agendamento salvo, mas nenhuma nova tarefa Buffer foi criada.");
+    return;
+  }
+
+  const result = await sendContentTasksToBackend(contentId, tasks, "queue");
+  toast(result.published ? `${result.published} post(s) agendados no Buffer.` : "Agendamento salvo. Nenhum post novo foi enviado ao Buffer.");
 }
 
 function koinMetricPayload(data) {
@@ -2001,40 +2154,21 @@ document.addEventListener("click", async (event) => {
       toast("Editando conteudo.");
     }
     if (action === "advanceContent") {
-      const content = state.content.find((item) => item.id === id);
-      const next = content.status === "Rascunho"
-        ? "Aprovacao"
-        : content.status === "Aprovacao"
-          ? "Agendado"
-          : content.status;
-      const patch = { status: next };
-      if (next === "Agendado") patch.approved_at = new Date().toISOString();
-      await updateRecord("content", id, patch);
-      const queued = next === "Agendado" ? await createDistributionQueueForContent({ ...content, ...patch }) : [];
-      let publishResult = null;
-      let publishError = "";
-      if (queued.length && configuredBackendUrl() && backendToken()) {
-        try {
-          publishResult = await backendRequest("/api/publish", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ limit: queued.length })
-          });
-          await syncAllFromSupabase(false);
-        } catch (error) {
-          publishError = error.message;
-        }
-      }
+      const content = requireContentItem(id);
+      if (content.status !== "Rascunho") throw new Error("Use Postar agora ou Agendar para conteudos em aprovacao.");
+      await updateRecord("content", id, {
+        status: "Aprovacao",
+        next_action: "Aprovar: postar agora ou agendar"
+      });
       saveState();
       render();
-      let message = "Conteudo avancou na esteira.";
-      if (next === "Agendado") {
-        if (!queued.length) message = "Conteudo aprovado, mas nenhuma nova tarefa Buffer foi criada.";
-        else if (publishResult?.published) message = `Conteudo aprovado e ${publishResult.published} post(s) enviados ao Buffer.`;
-        else if (publishError) message = `Fila criada, mas o backend nao publicou: ${publishError}`;
-        else message = `Conteudo aprovado: ${queued.length} tarefa(s) criadas. O GitHub Actions publica sozinho.`;
-      }
-      toast(message);
+      toast("Rascunho enviado para revisao. Agora escolha Postar agora ou Agendar.");
+    }
+    if (action === "publishContentNow") {
+      await publishContentNow(id);
+    }
+    if (action === "scheduleContent") {
+      await scheduleContent(id);
     }
     if (action === "rejectContent") {
       await updateRecord("content", id, {

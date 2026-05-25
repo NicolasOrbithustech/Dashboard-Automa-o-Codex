@@ -316,12 +316,12 @@
           <div class="backend-actionbar panel">
             <div>
               <h4>Publicador automatico</h4>
-              <p class="muted">Ao aprovar um post, o dashboard cria a fila. O GitHub Actions publica sozinho; com backend conectado voce tambem pode subir imagem e disparar agora.</p>
+              <p class="muted">Crie o post, envie para revisao e escolha no card aprovado: postar agora ou agendar.</p>
             </div>
             <div class="row-actions">
               <button class="secondary-btn" id="testBackendBtn" type="button">Testar backend</button>
               <button class="primary-btn" id="publishNowBtn" type="button">
-                <svg><use href="#icon-play"></use></svg><span>Publicar fila agora</span>
+                <svg><use href="#icon-play"></use></svg><span>Processar fila pendente</span>
               </button>
             </div>
           </div>
@@ -401,6 +401,7 @@
                 </select>
               </label>
               <label class="field"><span>Data alvo</span><input name="due_date" type="date" /></label>
+              <label class="field"><span>Agendar para</span><input name="scheduled_for" type="datetime-local" /></label>
               <label class="field"><span>Proxima acao</span><input name="next_action" placeholder="Revisar e aprovar" /></label>
               <button class="primary-btn form-submit" type="submit">
                 <svg><use href="#icon-plus"></use></svg><span>Salvar post</span>
