@@ -504,49 +504,107 @@ function applyGeneratedContent(form, content) {
   form.elements.status.value = "Rascunho";
 }
 
-async function generatePostText() {
+async function generatePostText(options = {}) {
+  const { manageUi = true } = options;
   const form = qs("#contentForm");
-  updateBackendStatus("Gerando texto OpenAI...", "info");
-  const result = await backendRequest("/api/generate-post", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(generationInput(form))
-  });
-  applyGeneratedContent(form, result.content || {});
-  updateBackendStatus("Backend pronto", "ok");
-  toast("Texto gerado. Revise antes de aprovar.");
-  return result.content;
+  if (manageUi) setAiGenerationBusy(true, "generateTextBtn", "Criando texto...");
+  try {
+    updateBackendStatus("Gerando texto OpenAI...", "info");
+    const result = await backendRequest("/api/generate-post", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(generationInput(form))
+    });
+    applyGeneratedContent(form, result.content || {});
+    updateBackendStatus("Backend pronto", "ok");
+    toast("Texto gerado. Revise antes de aprovar.");
+    return result.content;
+  } finally {
+    if (manageUi) setAiGenerationBusy(false);
+  }
 }
 
-async function generatePostImage() {
+async function generatePostImage(options = {}) {
+  const { manageUi = true } = options;
   const form = qs("#contentForm");
-  updateBackendStatus("Gerando imagem OpenAI...", "info");
-  const input = generationInput(form);
-  const result = await backendRequest("/api/generate-image", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...input,
-      prompt: input.improvementPrompt || input.body || input.prompt,
-      filename: form.elements.title?.value || "post-koins"
-    })
-  });
-  form.elements.asset_url.value = result.media.url;
-  if (result.media.revisedPrompt) {
-    form.elements.revision_notes.value = [
-      form.elements.revision_notes.value,
-      `Prompt revisado pela OpenAI: ${result.media.revisedPrompt}`
-    ].filter(Boolean).join("\n");
+  if (manageUi) {
+    setAiGenerationBusy(true, "generateImageBtn", "Criando imagem...");
+    setImageLoading("Criando imagem com OpenAI...");
   }
-  setImagePreview(result.media.url, form.elements.title.value || "Imagem OpenAI");
-  updateBackendStatus("Backend pronto", "ok");
-  toast("Imagem criada e anexada ao post.");
-  return result.media;
+  try {
+    updateBackendStatus("Gerando imagem OpenAI...", "info");
+    const input = generationInput(form);
+    const result = await backendRequest("/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...input,
+        prompt: input.improvementPrompt || input.body || input.prompt,
+        filename: form.elements.title?.value || "post-koins"
+      })
+    });
+    form.elements.asset_url.value = result.media.url;
+    if (result.media.revisedPrompt) {
+      form.elements.revision_notes.value = [
+        form.elements.revision_notes.value,
+        `Prompt revisado pela OpenAI: ${result.media.revisedPrompt}`
+      ].filter(Boolean).join("\n");
+    }
+    setImagePreview(result.media.url, form.elements.title.value || "Imagem OpenAI");
+    updateBackendStatus("Backend pronto", "ok");
+    toast("Imagem criada e anexada ao post.");
+    return result.media;
+  } catch (error) {
+    setImagePreview(form.elements.asset_url.value, form.elements.title.value || "Imagem atual");
+    throw error;
+  } finally {
+    if (manageUi) setAiGenerationBusy(false);
+  }
 }
 
 async function generateCompletePost() {
-  await generatePostText();
-  await generatePostImage();
+  setAiGenerationBusy(true, "generateCompleteBtn", "Criando post...");
+  setImageLoading("Preparando texto e imagem...");
+  try {
+    await generatePostText({ manageUi: false });
+    setImageLoading("Criando imagem com OpenAI...");
+    await generatePostImage({ manageUi: false });
+  } catch (error) {
+    const form = qs("#contentForm");
+    setImagePreview(form.elements.asset_url.value, form.elements.title.value || "Imagem atual");
+    throw error;
+  } finally {
+    setAiGenerationBusy(false);
+  }
+}
+
+function setAiGenerationBusy(isBusy, activeId = "", label = "Gerando...") {
+  qsa("#generateTextBtn, #generateImageBtn, #generateCompleteBtn").forEach((button) => {
+    if (!button.dataset.defaultHtml) button.dataset.defaultHtml = button.innerHTML;
+    const active = button.id === activeId;
+    button.disabled = isBusy;
+    button.classList.toggle("is-loading", isBusy && active);
+    button.setAttribute("aria-busy", isBusy && active ? "true" : "false");
+    button.innerHTML = isBusy && active
+      ? `<span class="button-spinner" aria-hidden="true"></span><span>${esc(label)}</span>`
+      : button.dataset.defaultHtml;
+  });
+}
+
+function setImageLoading(message = "Criando imagem com OpenAI...") {
+  const preview = qs("#imagePreview");
+  if (!preview) return;
+  preview.hidden = false;
+  preview.classList.add("is-loading");
+  preview.setAttribute("aria-busy", "true");
+  preview.setAttribute("role", "status");
+  preview.innerHTML = `
+    <div class="image-loading">
+      <span class="image-spinner" aria-hidden="true"></span>
+      <strong>${esc(message)}</strong>
+      <span>Isso pode levar alguns segundos.</span>
+    </div>
+  `;
 }
 
 function normalizeSites(sites) {
@@ -1569,6 +1627,9 @@ function setContentFormMode(contentId = null) {
 function setImagePreview(url, label = "Midia selecionada") {
   const preview = qs("#imagePreview");
   if (!preview) return;
+  preview.classList.remove("is-loading");
+  preview.removeAttribute("aria-busy");
+  preview.removeAttribute("role");
   if (!url) {
     preview.hidden = true;
     preview.innerHTML = "";

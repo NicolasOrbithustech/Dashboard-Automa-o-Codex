@@ -326,6 +326,25 @@ button {
   background: #0b655f;
 }
 
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.ghost-btn:disabled,
+.icon-btn:disabled,
+.mini-btn:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.button-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.85s linear infinite;
+  flex: 0 0 auto;
+}
+
 .secondary-btn,
 .ghost-btn {
   padding: 0 14px;
@@ -641,6 +660,7 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: #0f172a;
+  min-height: 178px;
 }
 
 .upload-preview img {
@@ -648,6 +668,52 @@ button {
   max-height: 320px;
   object-fit: cover;
   display: block;
+}
+
+.upload-preview.is-loading {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(35, 103, 166, 0.1)),
+    #f7f9fc;
+}
+
+.image-loading {
+  width: 100%;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 22px;
+  color: var(--slate);
+  text-align: center;
+}
+
+.image-loading strong {
+  font-size: 15px;
+}
+
+.image-loading span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.image-spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #cfe2ef;
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .advanced-block {
