@@ -12,8 +12,8 @@ window.KOINOPS_BACKEND = {
 window.KOINOPS_AUTH = {
   enabled: false,
   provider: "aws-cognito",
-  cognitoDomain: "",
-  clientId: "",
+  cognitoDomain: "https://koinops-nicolas-sandbox.auth.us-east-2.amazoncognito.com",
+  clientId: "3035tmlje9mph30ngbbdl75p00",
   redirectUri: "https://dashboard-redes-automatico.vercel.app/dashboard/",
   logoutUri: "https://dashboard-redes-automatico.vercel.app/dashboard/",
   scopes: "openid email profile"

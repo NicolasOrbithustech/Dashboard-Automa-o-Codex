@@ -186,8 +186,9 @@ function currentAuthConfig() {
   } catch {
     saved = {};
   }
+  const hasSavedEnabled = Object.prototype.hasOwnProperty.call(saved, "enabled");
   return {
-    enabled: Boolean(authDefaults.enabled || saved.enabled),
+    enabled: hasSavedEnabled ? Boolean(saved.enabled) : Boolean(authDefaults.enabled),
     provider: "aws-cognito",
     cognitoDomain: normalizeAuthDomain(saved.cognitoDomain || authDefaults.cognitoDomain),
     clientId: String(saved.clientId || authDefaults.clientId || "").trim(),
@@ -197,8 +198,12 @@ function currentAuthConfig() {
   };
 }
 
-function authConfigComplete(config = currentAuthConfig()) {
-  return Boolean(config.enabled && config.cognitoDomain && config.clientId && config.redirectUri);
+function authConfigReady(config = currentAuthConfig()) {
+  return Boolean(config.cognitoDomain && config.clientId && config.redirectUri);
+}
+
+function authRequired(config = currentAuthConfig()) {
+  return Boolean(config.enabled && authConfigReady(config));
 }
 
 function decodeJwtPayload(token) {
@@ -250,7 +255,7 @@ async function sha256Base64Url(value) {
 
 async function startAwsLogin() {
   const config = currentAuthConfig();
-  if (!authConfigComplete(config)) {
+  if (!authConfigReady(config)) {
     switchView("settings");
     toast("Complete os dados do AWS Cognito em Governanca.");
     return;
@@ -284,7 +289,7 @@ async function finishAwsLoginIfNeeded() {
   const expectedState = sessionStorage.getItem(AUTH_STATE_KEY);
   const verifier = sessionStorage.getItem(AUTH_VERIFIER_KEY);
 
-  if (!authConfigComplete(config) || !verifier || (expectedState && expectedState !== stateValue)) {
+  if (!authConfigReady(config) || !verifier || (expectedState && expectedState !== stateValue)) {
     toast("Login AWS recusado. Confira a configuracao do Cognito.");
     return true;
   }
@@ -323,7 +328,7 @@ async function finishAwsLoginIfNeeded() {
 function logoutAws() {
   const config = currentAuthConfig();
   localStorage.removeItem(AUTH_SESSION_KEY);
-  if (authConfigComplete(config)) {
+  if (authConfigReady(config)) {
     const params = new URLSearchParams({
       client_id: config.clientId,
       logout_uri: config.logoutUri
@@ -335,7 +340,11 @@ function logoutAws() {
 }
 
 function disableLocalAuth() {
-  localStorage.removeItem(AUTH_CONFIG_KEY);
+  const config = currentAuthConfig();
+  localStorage.setItem(AUTH_CONFIG_KEY, JSON.stringify({
+    ...config,
+    enabled: false
+  }));
   localStorage.removeItem(AUTH_SESSION_KEY);
   renderAuth();
   toast("Login AWS desativado neste navegador.");
@@ -343,7 +352,8 @@ function disableLocalAuth() {
 
 function renderAuth() {
   const config = currentAuthConfig();
-  const complete = authConfigComplete(config);
+  const ready = authConfigReady(config);
+  const required = authRequired(config);
   const session = authSession();
   const claims = session?.claims || {};
   const label = claims.email || claims["cognito:username"] || claims.username || "AWS conectado";
@@ -354,14 +364,14 @@ function renderAuth() {
   const logoutBtn = qs("#logoutBtn");
 
   if (authStatus) {
-    authStatus.textContent = complete ? (session ? label : "Login AWS ativo") : "Login AWS pendente";
-    authStatus.dataset.type = complete ? (session ? "ok" : "warn") : "warn";
+    authStatus.textContent = ready ? (session ? label : (required ? "Login AWS ativo" : "Login AWS configurado")) : "Login AWS pendente";
+    authStatus.dataset.type = ready ? (session ? "ok" : (required ? "warn" : "info")) : "warn";
   }
-  if (loginBtn) loginBtn.hidden = complete && Boolean(session);
+  if (loginBtn) loginBtn.hidden = !ready || Boolean(session);
   if (logoutBtn) logoutBtn.hidden = !session;
 
   if (!authGate || !appShell) return;
-  if (complete && !session) {
+  if (required && !session) {
     authGate.hidden = false;
     appShell.hidden = true;
   } else {
