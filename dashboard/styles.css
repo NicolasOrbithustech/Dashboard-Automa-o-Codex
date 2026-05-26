@@ -397,6 +397,121 @@ button {
   font-size: 16px;
 }
 
+.codex-plan {
+  margin-bottom: 16px;
+}
+
+.codex-plan-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #b9e8cf;
+  border-left: 4px solid var(--green);
+  border-radius: var(--radius);
+  background: #fbfffd;
+  box-shadow: var(--shadow);
+}
+
+.codex-plan-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.codex-plan-head h4 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.codex-plan-head p {
+  margin: 0;
+}
+
+.codex-plan-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.codex-plan-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.codex-plan-metrics article {
+  min-height: 86px;
+  display: grid;
+  align-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.codex-plan-metrics span,
+.codex-plan-metrics small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.codex-plan-metrics strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.codex-schedule-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.codex-schedule-list article {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.codex-schedule-list strong {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border-radius: var(--radius);
+  background: #e4f4ef;
+  color: var(--teal);
+  font-size: 18px;
+}
+
+.codex-schedule-list h5,
+.codex-schedule-list p {
+  margin: 0;
+}
+
+.codex-schedule-list p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.codex-guardrail {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #fff8e6;
+  color: #664400;
+  font-size: 13px;
+}
+
 .muted {
   color: var(--muted);
   font-size: 12px;
@@ -1111,7 +1226,9 @@ button {
   .kpi-grid,
   .matrix-grid,
   .kanban,
-  .workflow-strip {
+  .workflow-strip,
+  .codex-plan-metrics,
+  .codex-schedule-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1181,8 +1298,15 @@ button {
   .kanban,
   .workflow-strip,
   .metric-pair,
-  .ai-controls {
+  .ai-controls,
+  .codex-plan-metrics,
+  .codex-schedule-list,
+  .codex-plan-head {
     grid-template-columns: 1fr;
+  }
+
+  .codex-plan-actions {
+    justify-content: flex-start;
   }
 
   .section-head,

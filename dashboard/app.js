@@ -69,6 +69,33 @@ const titles = {
 };
 
 const columns = ["Rascunho", "Aprovacao", "Agendado", "Publicado"];
+const codexContentPlans = [
+  {
+    id: "pesquisa-premios-organico-2026-05-26",
+    siteLabel: "Pesquisa Premios",
+    title: "2 posts organicos por dia",
+    period: "26/05 a 31/05/2026",
+    start: "2026-05-26T00:00:00-03:00",
+    end: "2026-05-31T23:59:59-03:00",
+    totalDrafts: 12,
+    cadence: "2 rascunhos por dia",
+    status: "ativa",
+    owner: "Codex",
+    guardrail: "Cria apenas rascunhos. Voce aprova e escolhe Postar agora ou Agendar.",
+    windows: [
+      {
+        label: "Manha",
+        time: "09:00",
+        output: "1 rascunho com legenda, CTA para link na bio e ideia/imagem."
+      },
+      {
+        label: "Tarde",
+        time: "17:00",
+        output: "1 rascunho com angulo diferente para evitar repeticao."
+      }
+    ]
+  }
+];
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -932,6 +959,35 @@ function formatDate(value) {
   return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function plainText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function siteForCodexPlan(plan) {
+  const target = plainText(plan.siteLabel);
+  return state.sites.find((site) => plainText(site.name).includes(target) || target.includes(plainText(site.name)));
+}
+
+function contentDateForPlan(item) {
+  return item.created_at || item.scheduled_for || item.due_date || "";
+}
+
+function contentItemsForCodexPlan(plan) {
+  const site = siteForCodexPlan(plan);
+  const start = new Date(plan.start);
+  const end = new Date(plan.end);
+  return state.content.filter((item) => {
+    if (site && item.site_id !== site.id) return false;
+    const rawDate = contentDateForPlan(item);
+    if (!rawDate) return false;
+    const date = new Date(rawDate.length === 10 ? `${rawDate}T12:00:00-03:00` : rawDate);
+    return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+  });
+}
+
 function formatShortDate(value) {
   if (!value) return "Sem data";
   const date = new Date(`${value}T00:00:00`);
@@ -982,6 +1038,7 @@ function render() {
   renderFunnel();
   renderSites();
   renderSocial();
+  renderCodexAutomationPlan();
   renderAutomations();
   renderContent();
   renderDistribution();
@@ -1198,6 +1255,56 @@ function renderSocial() {
       </div>
     </article>
   `).join("") : emptyState("Nenhuma rede encontrada para o filtro atual.");
+}
+
+function renderCodexAutomationPlan() {
+  const root = qs("#codexAutomationPlan");
+  if (!root) return;
+
+  root.innerHTML = codexContentPlans.map((plan) => {
+    const site = siteForCodexPlan(plan);
+    const items = contentItemsForCodexPlan(plan);
+    const waitingReview = items.filter((item) => ["Rascunho", "Aprovacao"].includes(item.status)).length;
+    const sentToBuffer = items.filter((item) => ["Agendado", "Publicado"].includes(item.status)).length;
+    const remaining = Math.max(0, plan.totalDrafts - items.length);
+    return `
+      <section class="codex-plan-panel">
+        <div class="codex-plan-head">
+          <div>
+            <p class="eyebrow">Automacao do Codex ativa</p>
+            <h4>${esc(plan.title)}</h4>
+            <p class="muted">${esc(site?.name || plan.siteLabel)} - ${esc(plan.period)} - ${esc(plan.cadence)}</p>
+          </div>
+          <div class="codex-plan-actions">
+            ${statusChip(plan.status)}
+            <button class="secondary-btn compact-btn" type="button" data-action="openContent">Ver Conteudo</button>
+          </div>
+        </div>
+        <div class="codex-plan-metrics">
+          <article><span>Meta da semana</span><strong>${esc(plan.totalDrafts)}</strong><small>rascunhos</small></article>
+          <article><span>Visiveis no painel</span><strong>${esc(items.length)}</strong><small>posts desta semana</small></article>
+          <article><span>Para revisar</span><strong>${esc(waitingReview)}</strong><small>rascunho/aprovacao</small></article>
+          <article><span>Restantes</span><strong>${esc(remaining)}</strong><small>ate domingo</small></article>
+        </div>
+        <div class="codex-schedule-list">
+          ${plan.windows.map((windowItem) => `
+            <article>
+              <strong>${esc(windowItem.time)}</strong>
+              <div>
+                <h5>${esc(windowItem.label)}</h5>
+                <p>${esc(windowItem.output)}</p>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+        <div class="codex-guardrail">
+          <strong>Trava de seguranca:</strong>
+          <span>${esc(plan.guardrail)}</span>
+          <span>Agendados/publicados: ${esc(sentToBuffer)}</span>
+        </div>
+      </section>
+    `;
+  }).join("");
 }
 
 function renderAutomations() {
@@ -2149,6 +2256,10 @@ document.addEventListener("click", async (event) => {
       saveState();
       render();
       toast("Execucao registrada.");
+    }
+    if (action === "openContent") {
+      switchView("content");
+      return;
     }
     if (action === "editContent") {
       editContent(id);
