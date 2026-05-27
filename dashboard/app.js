@@ -519,13 +519,35 @@ function automationTargetChannel(automation) {
   return social?.channel || "Threads";
 }
 
-function automationGenerationInput(automation, site) {
-  const recent = state.content
-    .filter((item) => item.site_id === site.id)
-    .slice(0, 5)
-    .map((item) => item.title)
-    .filter(Boolean)
+function contentSortTime(item) {
+  const value = item.updated_at || item.created_at || item.scheduled_for || item.due_date || "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function recentContentForGeneration(siteId, limit = 8) {
+  return state.content
+    .filter((item) => item.site_id === siteId && item.id !== editingContentId)
+    .sort((a, b) => contentSortTime(b) - contentSortTime(a))
+    .slice(0, limit)
+    .map((item) => ({
+      title: item.title,
+      body: String(item.body || "").slice(0, 260),
+      image_prompt: String(item.improvement_prompt || "").slice(0, 220),
+      channel: item.channel,
+      status: item.status
+    }));
+}
+
+function recentContentBrief(items) {
+  return items
+    .map((item, index) => `${index + 1}. ${item.title || "sem titulo"} - ${String(item.body || item.image_prompt || "").slice(0, 180)}`)
     .join("; ");
+}
+
+function automationGenerationInput(automation, site) {
+  const recentContent = recentContentForGeneration(site.id, 8);
+  const recent = recentContentBrief(recentContent);
   const period = plainText(automation.name).includes("tarde") ? "tarde" : "manha";
   return {
     siteId: site.id,
@@ -549,7 +571,9 @@ function automationGenerationInput(automation, site) {
     imageText: "Koins viram premios",
     style: "Pesquisa Premios brand palette, dark navy background, yellow highlights, green CTA accents, one Brazilian adult, named gift cards, no money imagery, no official logos",
     size: "1024x1536",
-    quality: "medium"
+    quality: "medium",
+    recentContent,
+    variationSeed: `${automation.id || automation.name}-${Date.now()}`
   };
 }
 
@@ -616,6 +640,7 @@ function selectedSiteFromForm(form) {
 
 function generationInput(form) {
   const site = selectedSiteFromForm(form);
+  const recentContent = recentContentForGeneration(site.id || "", 8);
   return {
     siteId: site.id || "",
     siteName: site.name || "Pesquisa Premios",
@@ -633,7 +658,9 @@ function generationInput(form) {
     quality: form.elements.image_quality?.value || "medium",
     durationSeconds: Number(form.elements.video_duration?.value || 8),
     resolution: form.elements.video_resolution?.value || "720p",
-    aspectRatio: "9:16"
+    aspectRatio: "9:16",
+    recentContent,
+    variationSeed: `${site.id || "site"}-${Date.now()}-${Math.random().toString(16).slice(2)}`
   };
 }
 
