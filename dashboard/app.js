@@ -1202,8 +1202,31 @@ function formatShortDate(value) {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+function dateKeyFromDate(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function dateKey(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return "";
+  return dateKeyFromDate(date);
+}
+
+function shiftedDateKey(baseKey, days) {
+  const date = new Date(`${baseKey || todayValue()}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return dateKeyFromDate(date);
+}
+
 function todayValue() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKeyFromDate(new Date());
 }
 
 function statusChip(status) {
@@ -1394,11 +1417,40 @@ function currentKoinTotals() {
 }
 
 function currentReportTotals() {
-  return filtered(state.reports).reduce((total, item) => ({
+  const manual = filtered(state.reports).reduce((total, item) => ({
     traffic: total.traffic + item.traffic,
     posts: total.posts + item.posts,
     signups: total.signups + item.signups
   }), { traffic: 0, posts: 0, signups: 0 });
+  const operation = currentReportStats();
+  return {
+    ...manual,
+    posts: manual.posts + operation.contentTotal
+  };
+}
+
+function currentReportStats() {
+  const content = filtered(state.content);
+  const distribution = filtered(state.distribution);
+  const approvals = filtered(state.approvals);
+  const support = filtered(state.supportMessages);
+  const reports = filtered(state.reports);
+  const isStatus = (item, status) => String(item.status || "").toLowerCase() === status;
+  return {
+    contentTotal: content.length,
+    drafts: content.filter((item) => item.status === "Rascunho").length,
+    review: content.filter((item) => item.status === "Aprovacao").length,
+    scheduled: content.filter((item) => item.status === "Agendado").length,
+    published: content.filter((item) => item.status === "Publicado").length,
+    queuedTasks: distribution.filter((item) => ["fila", "agendado"].includes(String(item.status || "").toLowerCase())).length,
+    bufferAccepted: distribution.filter((item) => item.buffer_post_id).length,
+    publishedTasks: distribution.filter((item) => isStatus(item, "publicado") || item.published_at || item.published_url).length,
+    errors: distribution.filter((item) => isStatus(item, "erro") || item.error_message).length,
+    pendingApprovals: approvals.filter((item) => isStatus(item, "pendente")).length,
+    openSupport: support.filter((item) => !["respondido", "fechado"].includes(String(item.status || "").toLowerCase())).length,
+    manualTraffic: reports.reduce((total, item) => total + item.traffic, 0),
+    manualSignups: reports.reduce((total, item) => total + item.signups, 0)
+  };
 }
 
 function renderFunnel() {
@@ -1710,22 +1762,56 @@ function renderFaq() {
 }
 
 function reportSeries() {
-  const byDay = new Map();
+  const today = todayValue();
+  const byDay = new Map(Array.from({ length: 7 }, (_, index) => {
+    const key = shiftedDateKey(today, index - 6);
+    return [key, { report_date: key, traffic: 0, posts: 0, signups: 0, published: 0, errors: 0 }];
+  }));
   filtered(state.reports).forEach((item) => {
-    const key = item.report_date || todayValue();
-    const current = byDay.get(key) || { report_date: key, traffic: 0, posts: 0, signups: 0 };
+    const key = dateKey(item.report_date) || today;
+    const current = byDay.get(key);
+    if (!current) return;
     current.traffic += item.traffic;
     current.posts += item.posts;
     current.signups += item.signups;
-    byDay.set(key, current);
   });
-  const series = [...byDay.values()].sort((a, b) => new Date(a.report_date) - new Date(b.report_date)).slice(-7);
-  if (series.length) return series;
-  return ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map((day) => ({ label: day, traffic: 0, posts: 0, signups: 0 }));
+  filtered(state.content).forEach((item) => {
+    const key = dateKey(item.created_at || item.scheduled_for || item.due_date);
+    const current = byDay.get(key);
+    if (!current) return;
+    current.posts += 1;
+  });
+  filtered(state.distribution).forEach((item) => {
+    const key = dateKey(item.published_at || item.scheduled_for || item.created_at);
+    const current = byDay.get(key);
+    if (!current) return;
+    const status = String(item.status || "").toLowerCase();
+    if (status === "publicado" || item.published_at || item.published_url) current.published += 1;
+    if (status === "erro" || item.error_message) current.errors += 1;
+  });
+  return [...byDay.values()].sort((a, b) => new Date(a.report_date) - new Date(b.report_date));
 }
 
 function renderReports() {
   const series = reportSeries();
+  const stats = currentReportStats();
+  const totals = currentReportTotals();
+  const reportKpis = qs("#reportKpis");
+  if (reportKpis) {
+    reportKpis.innerHTML = [
+      { label: "Posts no painel", value: stats.contentTotal, hint: "rascunhos, aprovados, agendados e publicados" },
+      { label: "Aguardando revisao", value: stats.review, hint: "voce decide postar agora ou agendar" },
+      { label: "Agendados", value: stats.scheduled, hint: "ja enviados para calendario/fila" },
+      { label: "Publicados", value: Math.max(stats.published, stats.publishedTasks), hint: "marcados no painel ou confirmados por tarefa" },
+      { label: "Erros", value: stats.errors, hint: "tarefas que precisam de reenviar/verificar" }
+    ].map((item) => `
+      <article class="kpi">
+        <span>${esc(item.label)}</span>
+        <strong>${esc(item.value)}</strong>
+        <small>${esc(item.hint)}</small>
+      </article>
+    `).join("");
+  }
   const maxTotal = Math.max(1, ...series.map((item) => item.traffic + item.posts + item.signups));
   qs("#tractionChart").innerHTML = series.map((item) => {
     const traffic = Math.round(item.traffic / maxTotal * 100);
@@ -1744,15 +1830,35 @@ function renderReports() {
   }).join("");
   const last = state.auditLog.at(-1);
   qs("#lastAuditLabel").textContent = last ? last.date : "Sem auditoria";
-  const totals = currentReportTotals();
   const summary = [
-    `${state.sites.length} sites cadastrados no inventario principal.`,
-    `${filtered(state.socials).length} redes acompanhadas no filtro atual.`,
-    `${filtered(state.content).filter((item) => item.status !== "Publicado").length} conteudos em producao.`,
-    `${totals.signups} cadastros registrados em relatorios.`,
-    last ? last.summary : "Nenhuma auditoria registrada."
+    {
+      text: `${stats.contentTotal} posts no painel: ${stats.drafts} rascunho(s), ${stats.review} em revisao, ${stats.scheduled} agendado(s), ${stats.published} publicado(s).`,
+      status: stats.review ? "pendente" : "ok"
+    },
+    {
+      text: stats.errors
+        ? `${stats.errors} tarefa(s) de publicacao com erro. Abra Automacoes ou Conteudo para reenviar/verificar.`
+        : "Nenhum erro de publicacao encontrado no filtro atual.",
+      status: stats.errors ? "erro" : "ok"
+    },
+    {
+      text: `${stats.queuedTasks} tarefa(s) em fila/agendadas, ${stats.bufferAccepted} aceita(s) pelo Buffer e ${stats.publishedTasks} marcada(s) como publicadas.`,
+      status: stats.queuedTasks ? "pendente" : "info"
+    },
+    {
+      text: `${stats.pendingApprovals} aprovacao(oes) gerais pendentes e ${stats.openSupport} atendimento(s) de suporte em aberto.`,
+      status: stats.pendingApprovals || stats.openSupport ? "pendente" : "ok"
+    },
+    {
+      text: `${totals.traffic} visitas e ${totals.signups} cadastros registrados manualmente. Estes numeros ficam automaticos quando Analytics/API forem conectados.`,
+      status: totals.traffic || totals.signups ? "ok" : "info"
+    },
+    {
+      text: last ? last.summary : "Nenhuma auditoria registrada. Use Auditar para criar um marco de checagem do projeto.",
+      status: last ? "ok" : "info"
+    }
   ];
-  qs("#executiveSummary").innerHTML = summary.map((item) => `<article class="action-row"><p>${esc(item)}</p>${statusChip("info")}</article>`).join("");
+  qs("#executiveSummary").innerHTML = summary.map((item) => `<article class="action-row"><p>${esc(item.text)}</p>${statusChip(item.status)}</article>`).join("");
 }
 
 function renderSettings() {
