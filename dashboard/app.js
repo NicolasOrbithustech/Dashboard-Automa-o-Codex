@@ -50,6 +50,9 @@ let state = loadState();
 let currentView = "overview";
 let syncMode = "local";
 let editingContentId = null;
+let mediaUploadPromise = null;
+let mediaUploadToken = 0;
+let previewObjectUrl = "";
 let filters = {
   siteId: "all",
   search: ""
@@ -497,6 +500,48 @@ async function uploadMediaFile(file) {
   });
   updateBackendStatus("Backend pronto", "ok");
   return result.media.url;
+}
+
+async function replaceContentMediaFromFile(file) {
+  const form = qs("#contentForm");
+  const previousUrl = form.elements.asset_url.value;
+  const token = ++mediaUploadToken;
+  const localPreviewUrl = URL.createObjectURL(file);
+  form.elements.asset_url.value = "";
+  setImagePreview(localPreviewUrl, file.name, file.type);
+
+  const currentUpload = (async () => {
+    try {
+      const uploadedUrl = await uploadMediaFile(file);
+      if (token !== mediaUploadToken) return uploadedUrl;
+
+      form.elements.asset_url.value = uploadedUrl;
+      form.elements.media_file.value = "";
+      setImagePreview(uploadedUrl, file.name, file.type);
+
+      if (editingContentId) {
+        await updateRecord("content", editingContentId, { asset_url: uploadedUrl });
+        saveState();
+        renderContent();
+        renderContentSelects();
+        toast("Midia substituida no post atual.");
+      } else {
+        toast("Midia enviada e pronta para salvar no post.");
+      }
+      return uploadedUrl;
+    } catch (error) {
+      if (token === mediaUploadToken) {
+        form.elements.asset_url.value = previousUrl;
+        setImagePreview(previousUrl, form.elements.title.value || "Midia atual");
+      }
+      throw error;
+    } finally {
+      if (mediaUploadPromise === currentUpload) mediaUploadPromise = null;
+    }
+  })();
+
+  mediaUploadPromise = currentUpload;
+  return currentUpload;
 }
 
 function isContentDraftAutomation(automation) {
@@ -2121,6 +2166,11 @@ function setContentFormMode(contentId = null) {
 function setImagePreview(url, label = "Midia selecionada", contentType = "") {
   const preview = qs("#imagePreview");
   if (!preview) return;
+  if (previewObjectUrl && previewObjectUrl !== url) {
+    URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = "";
+  }
+  if (String(url || "").startsWith("blob:")) previewObjectUrl = url;
   preview.classList.remove("is-loading");
   preview.removeAttribute("aria-busy");
   preview.removeAttribute("role");
@@ -2173,8 +2223,9 @@ function editContent(contentId) {
 }
 
 async function saveContent(form) {
-  const data = new FormData(form);
   try {
+    if (mediaUploadPromise) await mediaUploadPromise;
+    const data = new FormData(form);
     const mediaFile = form.elements.media_file?.files?.[0];
     if (mediaFile) {
       const uploadedUrl = await uploadMediaFile(mediaFile);
@@ -2769,17 +2820,21 @@ qs("#cancelContentEditBtn").addEventListener("click", resetContentForm);
 
 qs("#mediaFileInput").addEventListener("change", (event) => {
   const [file] = event.target.files;
+  const form = qs("#contentForm");
   if (!file) {
-    setImagePreview("");
+    setImagePreview(form.elements.asset_url.value, form.elements.title.value || "Midia atual");
     return;
   }
   if (!["image/jpeg", "image/png", "video/mp4"].includes(file.type)) {
     toast("Envie apenas JPG, PNG ou MP4.");
     event.target.value = "";
-    setImagePreview("");
+    setImagePreview(form.elements.asset_url.value, form.elements.title.value || "Midia atual");
     return;
   }
-  setImagePreview(URL.createObjectURL(file), file.name, file.type);
+  replaceContentMediaFromFile(file).catch((error) => {
+    updateBackendStatus("Upload com erro", "risk");
+    toast(error.message);
+  });
 });
 
 qs("#generateTextBtn").addEventListener("click", () => {
